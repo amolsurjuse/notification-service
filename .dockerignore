@@ -1,0 +1,13 @@
+target
+.git
+.idea
+.vscode
+*.p8
+*service-account*.json
+*.pem
+*.key
+*.jks
+*.p12
+*.env
+application-local.yaml
+node_modules

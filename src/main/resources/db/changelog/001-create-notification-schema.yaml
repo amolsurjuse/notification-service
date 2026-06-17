@@ -1,0 +1,94 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-create-schema
+      author: notification-service
+      changes:
+        - sql:
+            sql: CREATE SCHEMA IF NOT EXISTS notification
+
+  - changeSet:
+      id: 002-create-notifications
+      author: notification-service
+      changes:
+        - createTable:
+            schemaName: notification
+            tableName: notifications
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: varchar(128), constraints: { nullable: false } }
+              - column: { name: event_id, type: varchar(128), constraints: { nullable: false } }
+              - column: { name: idempotency_key, type: varchar(160), constraints: { nullable: false } }
+              - column: { name: recipient_ref, type: varchar(160), constraints: { nullable: false } }
+              - column: { name: channel, type: varchar(32), constraints: { nullable: false } }
+              - column: { name: template_id, type: varchar(128), constraints: { nullable: false } }
+              - column: { name: subject, type: varchar(240) }
+              - column: { name: body, type: varchar(2000) }
+              - column: { name: payload_json, type: text }
+              - column: { name: status, type: varchar(32), constraints: { nullable: false } }
+              - column: { name: attempts, type: int, defaultValueNumeric: 0, constraints: { nullable: false } }
+              - column: { name: provider, type: varchar(64) }
+              - column: { name: provider_message_id, type: varchar(160) }
+              - column: { name: last_error, type: varchar(1000) }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: updated_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: dispatched_at, type: timestamptz }
+              - column: { name: read_at, type: timestamptz }
+        - addUniqueConstraint:
+            schemaName: notification
+            tableName: notifications
+            columnNames: idempotency_key, channel, recipient_ref
+            constraintName: uq_notifications_idempotency_channel_recipient
+        - createIndex:
+            schemaName: notification
+            tableName: notifications
+            indexName: idx_notifications_recipient_created
+            columns:
+              - column: { name: recipient_ref }
+              - column: { name: created_at }
+        - createIndex:
+            schemaName: notification
+            tableName: notifications
+            indexName: idx_notifications_status
+            columns:
+              - column: { name: status }
+
+  - changeSet:
+      id: 003-create-user-contacts
+      author: notification-service
+      changes:
+        - createTable:
+            schemaName: notification
+            tableName: user_contacts
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: varchar(128), constraints: { nullable: false } }
+              - column: { name: user_id, type: varchar(160), constraints: { nullable: false } }
+              - column: { name: contact_type, type: varchar(32), constraints: { nullable: false } }
+              - column: { name: destination_hash, type: varchar(128), constraints: { nullable: false } }
+              - column: { name: masked_destination, type: varchar(160), constraints: { nullable: false } }
+              - column: { name: provider, type: varchar(64) }
+              - column: { name: platform, type: varchar(32) }
+              - column: { name: status, type: varchar(32), constraints: { nullable: false } }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: updated_at, type: timestamptz, constraints: { nullable: false } }
+        - addUniqueConstraint:
+            schemaName: notification
+            tableName: user_contacts
+            columnNames: tenant_id, user_id, contact_type, destination_hash
+            constraintName: uq_user_contacts_user_type_destination
+
+  - changeSet:
+      id: 004-create-webhook-events
+      author: notification-service
+      changes:
+        - createTable:
+            schemaName: notification
+            tableName: webhook_events
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: provider, type: varchar(64), constraints: { nullable: false } }
+              - column: { name: event_type, type: varchar(128), constraints: { nullable: false } }
+              - column: { name: external_event_id, type: varchar(160) }
+              - column: { name: signature_valid, type: boolean, constraints: { nullable: false } }
+              - column: { name: payload_sha256, type: varchar(128), constraints: { nullable: false } }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
