@@ -55,4 +55,18 @@ public class RabbitNotificationConfig {
     ) {
         return BindingBuilder.bind(notificationDispatchQueue).to(notificationExchange).with(routingKey);
     }
+
+    @Bean
+    Queue notificationDomainEventQueue(@Value("${notification.broker.domain-event-queue}") String queue) {
+        return new Queue(queue, true);
+    }
+
+    @Bean
+    Binding notificationDomainEventBinding(
+            DirectExchange notificationExchange,
+            Queue notificationDomainEventQueue,
+            @Value("${notification.broker.domain-event-routing-key}") String routingKey
+    ) {
+        return BindingBuilder.bind(notificationDomainEventQueue).to(notificationExchange).with(routingKey);
+    }
 }

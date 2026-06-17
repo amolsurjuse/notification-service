@@ -79,4 +79,15 @@ public final class NotificationDtos {
 
     public record AcceptedResponse(String status, String message, List<NotificationResponse> notifications) {
     }
+
+    public record DomainNotificationEvent(
+            @NotBlank String eventId,
+            @NotBlank String eventType,
+            @NotBlank String tenantId,
+            @NotBlank String recipientRef,
+            String userId,
+            String occurredAt,
+            Map<String, Object> payload
+    ) {
+    }
 }

@@ -54,6 +54,8 @@ notification:
     exchange: ${NOTIFICATION_BROKER_EXCHANGE:notifications.events}
     dispatch-queue: ${NOTIFICATION_BROKER_DISPATCH_QUEUE:notifications.dispatch}
     dispatch-routing-key: ${NOTIFICATION_BROKER_DISPATCH_ROUTING_KEY:notifications.dispatch}
+    domain-event-queue: ${NOTIFICATION_BROKER_DOMAIN_EVENT_QUEUE:notifications.domain-events}
+    domain-event-routing-key: ${NOTIFICATION_BROKER_DOMAIN_EVENT_ROUTING_KEY:notifications.domain}
   contact:
     recipients: ${NOTIFICATION_CONTACT_RECIPIENTS:support@electrahub.net}
     ip-hash-salt: ${NOTIFICATION_CONTACT_IP_HASH_SALT:change-me}
@@ -77,6 +79,8 @@ notification:
         service-account-base64: ${FIREBASE_SERVICE_ACCOUNT_BASE64:}
     inapp:
       enabled: ${NOTIFICATION_CHANNEL_INAPP_ENABLED:true}
+  portal:
+    driver-reset-password-url: ${NOTIFICATION_DRIVER_RESET_PASSWORD_URL:https://driver-portal.electrahub.net/reset-password}
 
 logging:
   pattern:
