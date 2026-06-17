@@ -61,6 +61,9 @@ notification:
   channel:
     email:
       real-send-enabled: ${NOTIFICATION_CHANNEL_EMAIL_REAL_SEND_ENABLED:false}
+      daily-limit: ${NOTIFICATION_CHANNEL_EMAIL_DAILY_LIMIT:59}
+      rate-per-second: ${NOTIFICATION_CHANNEL_EMAIL_RATE_PER_SECOND:1}
+      retry-enabled: ${NOTIFICATION_CHANNEL_EMAIL_RETRY_ENABLED:false}
     sms:
       real-send-enabled: ${NOTIFICATION_CHANNEL_SMS_REAL_SEND_ENABLED:false}
     push:

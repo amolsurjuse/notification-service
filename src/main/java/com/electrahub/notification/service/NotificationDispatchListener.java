@@ -6,7 +6,6 @@ import com.electrahub.notification.repository.NotificationMessageRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,13 +38,18 @@ public class NotificationDispatchListener {
             return;
         }
 
-        DispatchResult result = adapter.dispatch(message);
+        DispatchResult result;
+        try {
+            result = adapter.dispatch(message);
+        } catch (RuntimeException ex) {
+            result = DispatchResult.failure("notification-service", "dispatch ignored after adapter exception: " + ex.getMessage());
+        }
         if (result.success()) {
             message.markDispatched(result.provider(), result.providerMessageId());
             log.info("Notification {} dispatched on channel {} provider {}", message.getId(), message.getChannel(), result.provider());
         } else {
             message.markFailed(result.error());
-            log.warn("Notification {} failed on channel {}: {}", message.getId(), message.getChannel(), result.error());
+            log.warn("Notification {} failed on channel {} and will not be retried: {}", message.getId(), message.getChannel(), result.error());
         }
         notificationRepository.save(message);
     }
