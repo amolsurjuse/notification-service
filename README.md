@@ -34,3 +34,35 @@ Email quota controls:
 | `NOTIFICATION_CHANNEL_EMAIL_RETRY_ENABLED` | `false` | Documents the no-retry policy; failed email dispatches are marked failed and ignored. |
 
 The daily cap is evaluated over the previous 24 hours from the notification database, so pod restarts do not reset the quota. Failed or disabled email dispatches are not requeued by the Rabbit listener.
+
+Firebase push notification controls:
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `NOTIFICATION_CHANNEL_PUSH_REAL_SEND_ENABLED` | `false` | Keeps Firebase Cloud Messaging disabled unless explicitly enabled. |
+| `NOTIFICATION_CHANNEL_PUSH_RATE_PER_SECOND` | `5` | Limits push dispatch spacing to avoid accidental bursts. |
+| `NOTIFICATION_CHANNEL_PUSH_DAILY_LIMIT` | `500` | Rolling 24-hour app-side cap. |
+| `FIREBASE_PROJECT_ID` | empty | Optional Firebase project id. |
+| `FIREBASE_SERVICE_ACCOUNT_PATH` | empty | Path to a mounted Firebase service account JSON file. |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | empty | Raw service account JSON for local runs only. Prefer a mounted secret in Kubernetes. |
+| `FIREBASE_SERVICE_ACCOUNT_BASE64` | empty | Base64-encoded service account JSON for secret-based deployments. |
+
+Push requests use channel `PUSH`. The adapter reads the device token from payload keys `fcmToken`, `deviceToken`, `pushToken`, or `registrationToken`; `recipientRef` is used only as a fallback token for internal callers. Provider failures are marked failed and ignored without retry.
+
+Example:
+
+```json
+{
+  "tenantId": "electrahub",
+  "eventId": "session-started-123",
+  "recipientRef": "user-123",
+  "channels": ["PUSH"],
+  "templateId": "session-started",
+  "subject": "Charging started",
+  "body": "Your charging session has started.",
+  "payload": {
+    "fcmToken": "<device-fcm-token>",
+    "sessionId": "session-123"
+  }
+}
+```

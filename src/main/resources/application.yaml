@@ -68,6 +68,13 @@ notification:
       real-send-enabled: ${NOTIFICATION_CHANNEL_SMS_REAL_SEND_ENABLED:false}
     push:
       real-send-enabled: ${NOTIFICATION_CHANNEL_PUSH_REAL_SEND_ENABLED:false}
+      daily-limit: ${NOTIFICATION_CHANNEL_PUSH_DAILY_LIMIT:500}
+      rate-per-second: ${NOTIFICATION_CHANNEL_PUSH_RATE_PER_SECOND:5}
+      firebase:
+        project-id: ${FIREBASE_PROJECT_ID:}
+        service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:}
+        service-account-json: ${FIREBASE_SERVICE_ACCOUNT_JSON:}
+        service-account-base64: ${FIREBASE_SERVICE_ACCOUNT_BASE64:}
     inapp:
       enabled: ${NOTIFICATION_CHANNEL_INAPP_ENABLED:true}
 
