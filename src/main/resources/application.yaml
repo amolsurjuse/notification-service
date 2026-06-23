@@ -23,7 +23,8 @@ spring:
   liquibase:
     enabled: ${SPRING_LIQUIBASE_ENABLED:true}
     change-log: classpath:db/changelog/db.changelog-master.yaml
-    default-schema: ${SPRING_LIQUIBASE_DEFAULT_SCHEMA:notification}
+    default-schema: ${SPRING_LIQUIBASE_DEFAULT_SCHEMA:public}
+    liquibase-schema: ${SPRING_LIQUIBASE_SCHEMA:public}
   rabbitmq:
     host: ${SPRING_RABBITMQ_HOST:localhost}
     port: ${SPRING_RABBITMQ_PORT:5672}
