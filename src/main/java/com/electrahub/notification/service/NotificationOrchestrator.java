@@ -17,6 +17,8 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -225,6 +227,20 @@ public class NotificationOrchestrator {
     }
 
     private void publishDispatch(UUID notificationId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            sendDispatch(notificationId);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                sendDispatch(notificationId);
+            }
+        });
+    }
+
+    private void sendDispatch(UUID notificationId) {
         rabbitTemplate.convertAndSend(exchange, dispatchRoutingKey, new DispatchCommand(notificationId));
         log.info("Queued notification {} for async dispatch", notificationId);
     }
