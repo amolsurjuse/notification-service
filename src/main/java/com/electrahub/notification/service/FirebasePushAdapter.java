@@ -1,8 +1,10 @@
 package com.electrahub.notification.service;
 
 import com.electrahub.notification.domain.Channel;
+import com.electrahub.notification.domain.ContactStatus;
 import com.electrahub.notification.domain.NotificationMessage;
 import com.electrahub.notification.repository.NotificationMessageRepository;
+import com.electrahub.notification.repository.PushDeviceRegistrationRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.firebase.messaging.Message;
@@ -23,6 +25,7 @@ public class FirebasePushAdapter implements ChannelAdapter {
     private static final TypeReference<Map<String, Object>> PAYLOAD_TYPE = new TypeReference<>() {};
 
     private final NotificationMessageRepository notificationRepository;
+    private final PushDeviceRegistrationRepository pushDeviceRepository;
     private final ObjectMapper objectMapper;
     private final FirebasePushSender sender;
     private final Clock clock;
@@ -33,6 +36,7 @@ public class FirebasePushAdapter implements ChannelAdapter {
 
     public FirebasePushAdapter(
             NotificationMessageRepository notificationRepository,
+            PushDeviceRegistrationRepository pushDeviceRepository,
             ObjectMapper objectMapper,
             FirebasePushSender sender,
             Clock clock,
@@ -41,6 +45,7 @@ public class FirebasePushAdapter implements ChannelAdapter {
             int ratePerSecond
     ) {
         this.notificationRepository = notificationRepository;
+        this.pushDeviceRepository = pushDeviceRepository;
         this.objectMapper = objectMapper;
         this.sender = sender;
         this.clock = clock;
@@ -73,6 +78,12 @@ public class FirebasePushAdapter implements ChannelAdapter {
         Map<String, Object> payload = parsePayload(message.getPayloadJson());
         String token = firstText(payload, "fcmToken", "deviceToken", "pushToken", "registrationToken");
         if (token == null) {
+            token = pushDeviceRepository
+                    .findByTenantIdAndProviderAndDeviceIdAndStatus(message.getTenantId(), "firebase", message.getRecipientRef(), ContactStatus.ACTIVE)
+                    .map(device -> safeTrim(device.getFcmToken()))
+                    .orElse(null);
+        }
+        if (token == null && looksLikeLegacyToken(message.getRecipientRef())) {
             token = safeTrim(message.getRecipientRef());
         }
         if (token == null) {
@@ -153,6 +164,11 @@ public class FirebasePushAdapter implements ChannelAdapter {
         }
         String trimmed = String.valueOf(value).trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private boolean looksLikeLegacyToken(String recipientRef) {
+        String value = safeTrim(recipientRef);
+        return value != null && value.length() >= 80 && !value.contains("@");
     }
 
     private synchronized void throttle() {

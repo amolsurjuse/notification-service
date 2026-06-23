@@ -4,8 +4,10 @@ import com.electrahub.notification.domain.Channel;
 import com.electrahub.notification.domain.ContactStatus;
 import com.electrahub.notification.domain.ContactType;
 import com.electrahub.notification.domain.NotificationMessage;
+import com.electrahub.notification.domain.PushDeviceRegistration;
 import com.electrahub.notification.domain.UserContact;
 import com.electrahub.notification.repository.NotificationMessageRepository;
+import com.electrahub.notification.repository.PushDeviceRegistrationRepository;
 import com.electrahub.notification.repository.UserContactRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,6 +32,7 @@ public class NotificationOrchestrator {
 
     private final NotificationMessageRepository notificationRepository;
     private final UserContactRepository contactRepository;
+    private final PushDeviceRegistrationRepository pushDeviceRepository;
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
     private final PrivacyHashService privacyHashService;
@@ -39,6 +42,7 @@ public class NotificationOrchestrator {
     public NotificationOrchestrator(
             NotificationMessageRepository notificationRepository,
             UserContactRepository contactRepository,
+            PushDeviceRegistrationRepository pushDeviceRepository,
             RabbitTemplate rabbitTemplate,
             ObjectMapper objectMapper,
             PrivacyHashService privacyHashService,
@@ -47,6 +51,7 @@ public class NotificationOrchestrator {
     ) {
         this.notificationRepository = notificationRepository;
         this.contactRepository = contactRepository;
+        this.pushDeviceRepository = pushDeviceRepository;
         this.rabbitTemplate = rabbitTemplate;
         this.objectMapper = objectMapper;
         this.privacyHashService = privacyHashService;
@@ -60,10 +65,14 @@ public class NotificationOrchestrator {
         List<NotificationDtos.NotificationResponse> responses = new ArrayList<>();
 
         for (Channel channel : request.channels().stream().filter(Objects::nonNull).distinct().toList()) {
-            NotificationMessage message = notificationRepository
-                    .findByIdempotencyKeyAndChannelAndRecipientRef(idempotencyKey, channel, request.recipientRef())
-                    .orElseGet(() -> createMessage(request, idempotencyKey, channel));
-            responses.add(NotificationMapper.toResponse(message));
+            if (channel == Channel.PUSH) {
+                responses.addAll(createPushMessages(request, idempotencyKey));
+            } else {
+                NotificationMessage message = notificationRepository
+                        .findByIdempotencyKeyAndChannelAndRecipientRef(idempotencyKey, channel, request.recipientRef())
+                        .orElseGet(() -> createMessage(request, idempotencyKey, channel, request.recipientRef()));
+                responses.add(NotificationMapper.toResponse(message));
+            }
         }
 
         return responses;
@@ -109,6 +118,38 @@ public class NotificationOrchestrator {
     }
 
     @Transactional
+    public NotificationDtos.PushDeviceResponse registerPushDevice(NotificationDtos.PushDeviceRegistrationRequest request) {
+        String tenantId = requiredTrim(request.tenantId(), "tenantId");
+        String userId = requiredTrim(request.userId(), "userId");
+        String provider = defaultProvider(request.provider());
+        String deviceId = requiredTrim(request.deviceId(), "deviceId");
+        String platform = requiredTrim(request.platform(), "platform").toLowerCase(Locale.ROOT);
+        String token = requiredTrim(request.fcmToken(), "fcmToken");
+        String tokenHash = privacyHashService.sha256(token);
+
+        PushDeviceRegistration device = pushDeviceRepository
+                .findByTenantIdAndUserIdAndProviderAndDeviceId(tenantId, userId, provider, deviceId)
+                .orElseGet(() -> new PushDeviceRegistration(tenantId, userId, deviceId, platform, provider));
+        device.updateToken(token, tokenHash, privacyHashService.maskToken(token));
+        return NotificationMapper.toResponse(pushDeviceRepository.save(device));
+    }
+
+    @Transactional
+    public void unregisterPushDevice(String tenantId, String userId, String provider, String deviceId) {
+        pushDeviceRepository
+                .findByTenantIdAndUserIdAndProviderAndDeviceId(
+                        requiredTrim(tenantId, "tenantId"),
+                        requiredTrim(userId, "userId"),
+                        defaultProvider(provider),
+                        requiredTrim(deviceId, "deviceId")
+                )
+                .ifPresent(device -> {
+                    device.deactivate();
+                    pushDeviceRepository.save(device);
+                });
+    }
+
+    @Transactional
     public NotificationDtos.AcceptedResponse submitContact(NotificationDtos.ContactSubmissionRequest request, String ipAddress) {
         String eventId = "contact-" + privacyHashService.sha256(request.email().toLowerCase(Locale.ROOT) + ":" + request.message());
         Map<String, Object> payload = Map.of(
@@ -134,12 +175,44 @@ public class NotificationOrchestrator {
         return new NotificationDtos.AcceptedResponse("ACCEPTED", "Contact request accepted for async processing", submit(submit));
     }
 
-    private NotificationMessage createMessage(NotificationDtos.SubmitNotificationRequest request, String idempotencyKey, Channel channel) {
+    private List<NotificationDtos.NotificationResponse> createPushMessages(NotificationDtos.SubmitNotificationRequest request, String idempotencyKey) {
+        List<PushDeviceRegistration> devices = pushDeviceRepository.findByTenantIdAndUserIdAndProviderAndStatus(
+                request.tenantId(),
+                request.recipientRef(),
+                "firebase",
+                ContactStatus.ACTIVE
+        );
+        if (devices.isEmpty()) {
+            NotificationMessage message = notificationRepository
+                    .findByIdempotencyKeyAndChannelAndRecipientRef(idempotencyKey, Channel.PUSH, request.recipientRef())
+                    .orElseGet(() -> createMessage(request, idempotencyKey, Channel.PUSH, request.recipientRef()));
+            return List.of(NotificationMapper.toResponse(message));
+        }
+
+        List<NotificationDtos.NotificationResponse> responses = new ArrayList<>();
+        for (PushDeviceRegistration device : devices) {
+            String childKey = childPushIdempotencyKey(idempotencyKey, device.getDeviceId());
+            NotificationMessage message = notificationRepository
+                    .findByIdempotencyKeyAndChannelAndRecipientRef(childKey, Channel.PUSH, device.getDeviceId())
+                    .orElseGet(() -> createMessage(request, childKey, Channel.PUSH, device.getDeviceId()));
+            responses.add(NotificationMapper.toResponse(message));
+        }
+        return responses;
+    }
+
+    private String childPushIdempotencyKey(String idempotencyKey, String deviceId) {
+        String suffix = ":push:" + privacyHashService.sha256(deviceId).substring(0, 16);
+        int maxPrefixLength = 160 - suffix.length();
+        String prefix = idempotencyKey.length() > maxPrefixLength ? idempotencyKey.substring(0, maxPrefixLength) : idempotencyKey;
+        return prefix + suffix;
+    }
+
+    private NotificationMessage createMessage(NotificationDtos.SubmitNotificationRequest request, String idempotencyKey, Channel channel, String recipientRef) {
         NotificationMessage message = new NotificationMessage(
                 request.tenantId(),
                 request.eventId(),
                 idempotencyKey,
-                request.recipientRef(),
+                recipientRef,
                 channel,
                 request.templateId()
         );
@@ -181,6 +254,19 @@ public class NotificationOrchestrator {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String requiredTrim(String value, String field) {
+        String trimmed = trimToNull(value);
+        if (trimmed == null) {
+            throw new IllegalArgumentException(field + " is required");
+        }
+        return trimmed;
+    }
+
+    private String defaultProvider(String provider) {
+        String trimmed = trimToNull(provider);
+        return trimmed == null ? "firebase" : trimmed.toLowerCase(Locale.ROOT);
     }
 
     private String defaultString(String value) {

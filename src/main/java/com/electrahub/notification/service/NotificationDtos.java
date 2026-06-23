@@ -68,6 +68,29 @@ public final class NotificationDtos {
     ) {
     }
 
+    public record PushDeviceRegistrationRequest(
+            @NotBlank String tenantId,
+            @NotBlank String userId,
+            @NotBlank @Size(max = 160) String deviceId,
+            @NotBlank @Size(max = 32) String platform,
+            @NotBlank @Size(max = 512) String fcmToken,
+            @Size(max = 64) String provider
+    ) {
+    }
+
+    public record PushDeviceResponse(
+            UUID id,
+            String tenantId,
+            String userId,
+            String deviceId,
+            String platform,
+            String provider,
+            String maskedToken,
+            String status,
+            OffsetDateTime lastSeenAt
+    ) {
+    }
+
     public record ContactSubmissionRequest(
             @NotBlank @Size(max = 160) String name,
             @NotBlank @Email @Size(max = 240) String email,

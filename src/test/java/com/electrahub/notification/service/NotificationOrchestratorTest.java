@@ -1,8 +1,11 @@
 package com.electrahub.notification.service;
 
 import com.electrahub.notification.domain.Channel;
+import com.electrahub.notification.domain.ContactStatus;
 import com.electrahub.notification.domain.NotificationMessage;
+import com.electrahub.notification.domain.PushDeviceRegistration;
 import com.electrahub.notification.repository.NotificationMessageRepository;
+import com.electrahub.notification.repository.PushDeviceRegistrationRepository;
 import com.electrahub.notification.repository.UserContactRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -31,6 +34,8 @@ class NotificationOrchestratorTest {
     @Mock
     UserContactRepository contactRepository;
     @Mock
+    PushDeviceRegistrationRepository pushDeviceRepository;
+    @Mock
     RabbitTemplate rabbitTemplate;
 
     @Test
@@ -38,6 +43,7 @@ class NotificationOrchestratorTest {
         NotificationOrchestrator orchestrator = new NotificationOrchestrator(
                 notificationRepository,
                 contactRepository,
+                pushDeviceRepository,
                 rabbitTemplate,
                 new ObjectMapper(),
                 new PrivacyHashService("salt"),
@@ -72,6 +78,7 @@ class NotificationOrchestratorTest {
         NotificationOrchestrator orchestrator = new NotificationOrchestrator(
                 notificationRepository,
                 contactRepository,
+                pushDeviceRepository,
                 rabbitTemplate,
                 new ObjectMapper(),
                 new PrivacyHashService("salt"),
@@ -99,5 +106,75 @@ class NotificationOrchestratorTest {
         assertThat(responses).hasSize(1);
         verify(notificationRepository, never()).save(any());
         verify(rabbitTemplate, never()).convertAndSend(any(String.class), any(String.class), any(Object.class));
+    }
+
+    @Test
+    void registerPushDeviceStoresMaskedTokenAndActivatesDevice() {
+        NotificationOrchestrator orchestrator = new NotificationOrchestrator(
+                notificationRepository,
+                contactRepository,
+                pushDeviceRepository,
+                rabbitTemplate,
+                new ObjectMapper(),
+                new PrivacyHashService("salt"),
+                "notifications.events",
+                "notifications.dispatch"
+        );
+        when(pushDeviceRepository.findByTenantIdAndUserIdAndProviderAndDeviceId("tenant-1", "user-1", "firebase", "device-1"))
+                .thenReturn(Optional.empty());
+        when(pushDeviceRepository.save(any(PushDeviceRegistration.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = orchestrator.registerPushDevice(new NotificationDtos.PushDeviceRegistrationRequest(
+                "tenant-1",
+                "user-1",
+                "device-1",
+                "iOS",
+                "very-long-firebase-token-value",
+                null
+        ));
+
+        assertThat(response.provider()).isEqualTo("firebase");
+        assertThat(response.platform()).isEqualTo("ios");
+        assertThat(response.maskedToken()).doesNotContain("very-long-firebase-token-value");
+        assertThat(response.status()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void submitPushFansOutToActiveRegisteredDevices() {
+        NotificationOrchestrator orchestrator = new NotificationOrchestrator(
+                notificationRepository,
+                contactRepository,
+                pushDeviceRepository,
+                rabbitTemplate,
+                new ObjectMapper(),
+                new PrivacyHashService("salt"),
+                "notifications.events",
+                "notifications.dispatch"
+        );
+        PushDeviceRegistration device = new PushDeviceRegistration("tenant-1", "user-1", "device-1", "ios", "firebase");
+        device.updateToken("firebase-token", "hash", "fire...oken");
+        when(pushDeviceRepository.findByTenantIdAndUserIdAndProviderAndStatus("tenant-1", "user-1", "firebase", ContactStatus.ACTIVE))
+                .thenReturn(List.of(device));
+        when(notificationRepository.findByIdempotencyKeyAndChannelAndRecipientRef(any(), eq(Channel.PUSH), eq("device-1")))
+                .thenReturn(Optional.empty());
+        when(notificationRepository.save(any(NotificationMessage.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        var responses = orchestrator.submit(new NotificationDtos.SubmitNotificationRequest(
+                "tenant-1",
+                "event-1",
+                "idem-1",
+                "user-1",
+                List.of(Channel.PUSH),
+                "session-started",
+                "Session started",
+                "Charging started.",
+                Map.of("sessionId", "s1")
+        ));
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).recipientRef()).isEqualTo("device-1");
+        verify(rabbitTemplate).convertAndSend(eq("notifications.events"), eq("notifications.dispatch"), any(DispatchCommand.class));
     }
 }

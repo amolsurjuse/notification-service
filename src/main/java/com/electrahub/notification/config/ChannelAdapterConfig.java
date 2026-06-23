@@ -2,6 +2,7 @@ package com.electrahub.notification.config;
 
 import com.electrahub.notification.domain.Channel;
 import com.electrahub.notification.repository.NotificationMessageRepository;
+import com.electrahub.notification.repository.PushDeviceRegistrationRepository;
 import com.electrahub.notification.service.ChannelAdapter;
 import com.electrahub.notification.service.FirebasePushAdapter;
 import com.electrahub.notification.service.FirebasePushSender;
@@ -25,6 +26,7 @@ public class ChannelAdapterConfig {
     @Bean
     List<ChannelAdapter> channelAdapters(
             NotificationMessageRepository notificationRepository,
+            PushDeviceRegistrationRepository pushDeviceRepository,
             ObjectMapper objectMapper,
             Clock clock,
             @Value("${notification.channel.email.real-send-enabled:false}") boolean emailEnabled,
@@ -56,6 +58,7 @@ public class ChannelAdapterConfig {
                 new NoopChannelAdapter(Channel.SMS),
                 new FirebasePushAdapter(
                         notificationRepository,
+                        pushDeviceRepository,
                         objectMapper,
                         firebasePushSender,
                         clock,

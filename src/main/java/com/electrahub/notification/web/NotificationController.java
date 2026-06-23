@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -46,6 +47,22 @@ public class NotificationController {
     @PostMapping("/contacts")
     public ResponseEntity<NotificationDtos.ContactResponse> registerContact(@Valid @RequestBody NotificationDtos.ContactRegistrationRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(orchestrator.registerContact(request));
+    }
+
+    @PostMapping("/push/devices")
+    public ResponseEntity<NotificationDtos.PushDeviceResponse> registerPushDevice(@Valid @RequestBody NotificationDtos.PushDeviceRegistrationRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(orchestrator.registerPushDevice(request));
+    }
+
+    @DeleteMapping("/push/devices/{deviceId}")
+    public ResponseEntity<Void> unregisterPushDevice(
+            @PathVariable String deviceId,
+            @RequestParam String tenantId,
+            @RequestParam String userId,
+            @RequestParam(defaultValue = "firebase") String provider
+    ) {
+        orchestrator.unregisterPushDevice(tenantId, userId, provider, deviceId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/contact")

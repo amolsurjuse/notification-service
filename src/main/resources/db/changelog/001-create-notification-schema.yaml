@@ -92,3 +92,48 @@ databaseChangeLog:
               - column: { name: signature_valid, type: boolean, constraints: { nullable: false } }
               - column: { name: payload_sha256, type: varchar(128), constraints: { nullable: false } }
               - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+
+  - changeSet:
+      id: 005-create-push-device-registrations
+      author: notification-service
+      changes:
+        - createTable:
+            schemaName: notification
+            tableName: push_device_registrations
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: varchar(128), constraints: { nullable: false } }
+              - column: { name: user_id, type: varchar(160), constraints: { nullable: false } }
+              - column: { name: device_id, type: varchar(160), constraints: { nullable: false } }
+              - column: { name: platform, type: varchar(32), constraints: { nullable: false } }
+              - column: { name: provider, type: varchar(64), defaultValue: firebase, constraints: { nullable: false } }
+              - column: { name: fcm_token, type: text, constraints: { nullable: false } }
+              - column: { name: token_hash, type: varchar(128), constraints: { nullable: false } }
+              - column: { name: masked_token, type: varchar(160), constraints: { nullable: false } }
+              - column: { name: status, type: varchar(32), constraints: { nullable: false } }
+              - column: { name: last_seen_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: updated_at, type: timestamptz, constraints: { nullable: false } }
+        - addUniqueConstraint:
+            schemaName: notification
+            tableName: push_device_registrations
+            columnNames: tenant_id, user_id, provider, device_id
+            constraintName: uq_push_devices_user_provider_device
+        - createIndex:
+            schemaName: notification
+            tableName: push_device_registrations
+            indexName: idx_push_devices_user_status
+            columns:
+              - column: { name: tenant_id }
+              - column: { name: user_id }
+              - column: { name: provider }
+              - column: { name: status }
+        - createIndex:
+            schemaName: notification
+            tableName: push_device_registrations
+            indexName: idx_push_devices_device_status
+            columns:
+              - column: { name: tenant_id }
+              - column: { name: provider }
+              - column: { name: device_id }
+              - column: { name: status }

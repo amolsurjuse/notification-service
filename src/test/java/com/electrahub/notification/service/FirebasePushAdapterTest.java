@@ -1,8 +1,11 @@
 package com.electrahub.notification.service;
 
 import com.electrahub.notification.domain.Channel;
+import com.electrahub.notification.domain.ContactStatus;
 import com.electrahub.notification.domain.NotificationMessage;
+import com.electrahub.notification.domain.PushDeviceRegistration;
 import com.electrahub.notification.repository.NotificationMessageRepository;
+import com.electrahub.notification.repository.PushDeviceRegistrationRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.firebase.messaging.Message;
 import org.junit.jupiter.api.Test;
@@ -10,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -26,8 +30,9 @@ class FirebasePushAdapterTest {
     @Test
     void disabledPushFailsWithoutCallingFirebase() throws Exception {
         NotificationMessageRepository repository = mock(NotificationMessageRepository.class);
+        PushDeviceRegistrationRepository pushDeviceRepository = mock(PushDeviceRegistrationRepository.class);
         FirebasePushSender sender = mock(FirebasePushSender.class);
-        FirebasePushAdapter adapter = new FirebasePushAdapter(repository, OBJECT_MAPPER, sender, CLOCK, false, 500, 5);
+        FirebasePushAdapter adapter = new FirebasePushAdapter(repository, pushDeviceRepository, OBJECT_MAPPER, sender, CLOCK, false, 500, 5);
 
         DispatchResult result = adapter.dispatch(message("{}"));
 
@@ -39,8 +44,10 @@ class FirebasePushAdapterTest {
     @Test
     void unconfiguredFirebaseFailsWithoutCallingProvider() throws Exception {
         NotificationMessageRepository repository = mock(NotificationMessageRepository.class);
+        PushDeviceRegistrationRepository pushDeviceRepository = mock(PushDeviceRegistrationRepository.class);
         FirebasePushAdapter adapter = new FirebasePushAdapter(
                 repository,
+                pushDeviceRepository,
                 OBJECT_MAPPER,
                 FirebasePushSender.unconfigured(),
                 CLOCK,
@@ -58,9 +65,10 @@ class FirebasePushAdapterTest {
     @Test
     void exhaustedDailyQuotaFailsWithoutCallingProvider() throws Exception {
         NotificationMessageRepository repository = mock(NotificationMessageRepository.class);
+        PushDeviceRegistrationRepository pushDeviceRepository = mock(PushDeviceRegistrationRepository.class);
         FirebasePushSender sender = configuredSender();
         when(repository.countAttemptedSince(eq(Channel.PUSH), any())).thenReturn(500L);
-        FirebasePushAdapter adapter = new FirebasePushAdapter(repository, OBJECT_MAPPER, sender, CLOCK, true, 500, 5);
+        FirebasePushAdapter adapter = new FirebasePushAdapter(repository, pushDeviceRepository, OBJECT_MAPPER, sender, CLOCK, true, 500, 5);
 
         DispatchResult result = adapter.dispatch(message("{\"fcmToken\":\"token-1\"}"));
 
@@ -72,10 +80,11 @@ class FirebasePushAdapterTest {
     @Test
     void sendsFirebaseMessageUsingPayloadToken() throws Exception {
         NotificationMessageRepository repository = mock(NotificationMessageRepository.class);
+        PushDeviceRegistrationRepository pushDeviceRepository = mock(PushDeviceRegistrationRepository.class);
         FirebasePushSender sender = configuredSender();
         when(sender.send(any())).thenReturn("projects/electrahub/messages/123");
         when(repository.countAttemptedSince(eq(Channel.PUSH), any())).thenReturn(0L);
-        FirebasePushAdapter adapter = new FirebasePushAdapter(repository, OBJECT_MAPPER, sender, CLOCK, true, 500, 5);
+        FirebasePushAdapter adapter = new FirebasePushAdapter(repository, pushDeviceRepository, OBJECT_MAPPER, sender, CLOCK, true, 500, 5);
 
         DispatchResult result = adapter.dispatch(message("""
                 {
@@ -89,6 +98,28 @@ class FirebasePushAdapterTest {
         assertThat(result.success()).isTrue();
         assertThat(result.provider()).isEqualTo("firebase-fcm");
         assertThat(result.providerMessageId()).isEqualTo("projects/electrahub/messages/123");
+        verify(sender).send(any(Message.class));
+    }
+
+    @Test
+    void sendsFirebaseMessageUsingRegisteredDeviceToken() throws Exception {
+        NotificationMessageRepository repository = mock(NotificationMessageRepository.class);
+        PushDeviceRegistrationRepository pushDeviceRepository = mock(PushDeviceRegistrationRepository.class);
+        FirebasePushSender sender = configuredSender();
+        PushDeviceRegistration device = new PushDeviceRegistration("tenant-1", "user-1", "device-1", "ios", "firebase");
+        device.updateToken("registered-token", "hash", "reg...ken");
+        when(sender.send(any())).thenReturn("projects/electrahub/messages/456");
+        when(repository.countAttemptedSince(eq(Channel.PUSH), any())).thenReturn(0L);
+        when(pushDeviceRepository.findByTenantIdAndProviderAndDeviceIdAndStatus("tenant-1", "firebase", "device-1", ContactStatus.ACTIVE))
+                .thenReturn(Optional.of(device));
+        FirebasePushAdapter adapter = new FirebasePushAdapter(repository, pushDeviceRepository, OBJECT_MAPPER, sender, CLOCK, true, 500, 5);
+
+        NotificationMessage message = new NotificationMessage("tenant-1", "event-1", "key-1", "device-1", Channel.PUSH, "template");
+        message.setPayloadJson("{\"title\":\"Session update\"}");
+        DispatchResult result = adapter.dispatch(message);
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.providerMessageId()).isEqualTo("projects/electrahub/messages/456");
         verify(sender).send(any(Message.class));
     }
 
