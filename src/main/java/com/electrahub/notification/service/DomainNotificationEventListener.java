@@ -3,14 +3,17 @@ package com.electrahub.notification.service;
 import com.electrahub.notification.domain.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class DomainNotificationEventListener {
@@ -29,36 +32,38 @@ public class DomainNotificationEventListener {
 
     @RabbitListener(queues = "${notification.broker.domain-event-queue}")
     public void onDomainEvent(NotificationDtos.DomainNotificationEvent event) {
-        List<Channel> channels = channelsFor(event.eventType());
-        if (channels.isEmpty()) {
-            log.info("Ignoring notification domain event {} because no channel is configured", event.eventType());
-            return;
-        }
+        withEventTrace(event.eventId(), () -> {
+            List<Channel> channels = channelsFor(event.eventType());
+            if (channels.isEmpty()) {
+                log.info("Ignoring notification domain event {} because no channel is configured", event.eventType());
+                return;
+            }
 
-        Map<String, Object> payload = new LinkedHashMap<>();
-        if (event.payload() != null) {
-            payload.putAll(event.payload());
-        }
-        payload.put("eventType", event.eventType());
-        payload.put("eventId", event.eventId());
-        payload.put("userId", event.userId() == null ? "" : event.userId());
-        if ("USER_PASSWORD_RESET_REQUESTED".equals(event.eventType()) && payload.get("resetUrl") == null) {
-            String token = String.valueOf(payload.getOrDefault("resetToken", ""));
-            payload.put("resetUrl", driverResetPasswordUrl + "?token=" + token);
-        }
+            Map<String, Object> payload = new LinkedHashMap<>();
+            if (event.payload() != null) {
+                payload.putAll(event.payload());
+            }
+            payload.put("eventType", event.eventType());
+            payload.put("eventId", event.eventId());
+            payload.put("userId", event.userId() == null ? "" : event.userId());
+            if ("USER_PASSWORD_RESET_REQUESTED".equals(event.eventType()) && payload.get("resetUrl") == null) {
+                String token = String.valueOf(payload.getOrDefault("resetToken", ""));
+                payload.put("resetUrl", driverResetPasswordUrl + "?token=" + token);
+            }
 
-        NotificationDtos.SubmitNotificationRequest request = new NotificationDtos.SubmitNotificationRequest(
-                event.tenantId(),
-                event.eventId(),
-                event.eventId() + ":" + event.eventType(),
-                event.recipientRef(),
-                channels,
-                templateFor(event.eventType()),
-                subjectFor(event.eventType(), payload),
-                bodyFor(event.eventType(), payload),
-                payload
-        );
-        orchestrator.submit(request);
+            NotificationDtos.SubmitNotificationRequest request = new NotificationDtos.SubmitNotificationRequest(
+                    event.tenantId(),
+                    event.eventId(),
+                    event.eventId() + ":" + event.eventType(),
+                    event.recipientRef(),
+                    channels,
+                    templateFor(event.eventType()),
+                    subjectFor(event.eventType(), payload),
+                    bodyFor(event.eventType(), payload),
+                    payload
+            );
+            orchestrator.submit(request);
+        });
     }
 
     private List<Channel> channelsFor(String eventType) {
@@ -105,5 +110,25 @@ public class DomainNotificationEventListener {
             case "PAYMENT_RECEIPT_READY", "CHARGING_RECEIPT_READY" -> "Your receipt is ready.";
             default -> String.valueOf(payload.getOrDefault("message", subjectFor(eventType, payload)));
         };
+    }
+
+    private void withEventTrace(String eventId, Runnable action) {
+        Map<String, String> previous = MDC.getCopyOfContextMap();
+        try {
+            MDC.put("traceId", traceIdFrom(eventId));
+            MDC.put("spanId", UUID.randomUUID().toString().replace("-", "").substring(0, 16));
+            action.run();
+        } finally {
+            if (previous == null || previous.isEmpty()) {
+                MDC.clear();
+            } else {
+                MDC.setContextMap(previous);
+            }
+        }
+    }
+
+    private String traceIdFrom(String seed) {
+        String value = seed == null || seed.isBlank() ? UUID.randomUUID().toString() : seed;
+        return UUID.nameUUIDFromBytes(value.getBytes(StandardCharsets.UTF_8)).toString().replace("-", "");
     }
 }
