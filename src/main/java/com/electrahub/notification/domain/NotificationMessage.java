@@ -141,6 +141,12 @@ public class NotificationMessage {
         this.attempts++;
     }
 
+    public void markSkipped(String reason) {
+        this.status = DeliveryStatus.SKIPPED;
+        this.lastError = reason == null ? "skipped" : reason.substring(0, Math.min(reason.length(), 1000));
+        this.attempts++;
+    }
+
     public void markRead() {
         this.status = DeliveryStatus.READ;
         this.readAt = OffsetDateTime.now();

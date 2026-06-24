@@ -87,7 +87,7 @@ public class FirebasePushAdapter implements ChannelAdapter {
             token = safeTrim(message.getRecipientRef());
         }
         if (token == null) {
-            return DispatchResult.failure("firebase-fcm", "PUSH_TOKEN_REQUIRED");
+            return DispatchResult.skipped("firebase-fcm", "PUSH_TOKEN_REQUIRED");
         }
 
         throttle();

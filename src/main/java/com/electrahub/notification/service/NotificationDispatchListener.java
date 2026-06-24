@@ -51,6 +51,9 @@ public class NotificationDispatchListener {
             if (result.success()) {
                 message.markDispatched(result.provider(), result.providerMessageId());
                 log.info("Notification {} dispatched on channel {} provider {}", message.getId(), message.getChannel(), result.provider());
+            } else if (result.skipped()) {
+                message.markSkipped(result.error());
+                log.info("Notification {} skipped on channel {}: {}", message.getId(), message.getChannel(), result.error());
             } else {
                 message.markFailed(result.error());
                 log.warn("Notification {} failed on channel {} and will not be retried: {}", message.getId(), message.getChannel(), result.error());

@@ -187,7 +187,7 @@ public class NotificationOrchestrator {
         if (devices.isEmpty()) {
             NotificationMessage message = notificationRepository
                     .findByIdempotencyKeyAndChannelAndRecipientRef(idempotencyKey, Channel.PUSH, request.recipientRef())
-                    .orElseGet(() -> createMessage(request, idempotencyKey, Channel.PUSH, request.recipientRef()));
+                    .orElseGet(() -> createSkippedMessage(request, idempotencyKey, Channel.PUSH, request.recipientRef(), "NO_ACTIVE_PUSH_DEVICE"));
             return List.of(NotificationMapper.toResponse(message));
         }
 
@@ -224,6 +224,28 @@ public class NotificationOrchestrator {
         NotificationMessage saved = notificationRepository.save(message);
         publishDispatch(saved.getId());
         return saved;
+    }
+
+    private NotificationMessage createSkippedMessage(
+            NotificationDtos.SubmitNotificationRequest request,
+            String idempotencyKey,
+            Channel channel,
+            String recipientRef,
+            String reason
+    ) {
+        NotificationMessage message = new NotificationMessage(
+                request.tenantId(),
+                request.eventId(),
+                idempotencyKey,
+                recipientRef,
+                channel,
+                request.templateId()
+        );
+        message.setSubject(trimToNull(request.subject()));
+        message.setBody(trimToNull(request.body()));
+        message.setPayloadJson(toJson(request.payload()));
+        message.markSkipped(reason);
+        return notificationRepository.save(message);
     }
 
     private void publishDispatch(UUID notificationId) {
