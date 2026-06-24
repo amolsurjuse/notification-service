@@ -69,7 +69,7 @@ public class DomainNotificationEventListener {
     private List<Channel> channelsFor(String eventType) {
         return switch (eventType) {
             case "USER_ACCOUNT_CREATED", "USER_PASSWORD_CHANGED" -> List.of(Channel.EMAIL, Channel.PUSH);
-            case "USER_PASSWORD_RESET_REQUESTED" -> List.of(Channel.EMAIL);
+            case "USER_PASSWORD_RESET_REQUESTED", "USER_EMAIL_VERIFICATION_REQUESTED" -> List.of(Channel.EMAIL);
             case "CHARGING_SESSION_STARTED", "CHARGING_SESSION_STOPPED", "CHARGING_BATTERY_FULL",
                  "CHARGING_IDLE_WARNING", "CHARGING_IDLE_STARTED" -> List.of(Channel.PUSH);
             case "PAYMENT_RECEIPT_READY", "CHARGING_RECEIPT_READY" -> List.of(Channel.EMAIL);
@@ -87,6 +87,7 @@ public class DomainNotificationEventListener {
             case "USER_ACCOUNT_CREATED" -> "Welcome to ElectraHub";
             case "USER_PASSWORD_CHANGED" -> "Your ElectraHub password was changed";
             case "USER_PASSWORD_RESET_REQUESTED" -> "Reset your ElectraHub password";
+            case "USER_EMAIL_VERIFICATION_REQUESTED" -> "Verify your ElectraHub email";
             case "CHARGING_SESSION_STARTED" -> "Charging session started";
             case "CHARGING_SESSION_STOPPED" -> "Charging session stopped";
             case "CHARGING_BATTERY_FULL" -> "Battery full";
@@ -101,6 +102,7 @@ public class DomainNotificationEventListener {
     private String bodyFor(String eventType, Map<String, Object> payload) {
         return switch (eventType) {
             case "USER_PASSWORD_RESET_REQUESTED" -> "Use this link to reset your password: " + payload.getOrDefault("resetUrl", "");
+            case "USER_EMAIL_VERIFICATION_REQUESTED" -> "Use this link to verify your email address: " + payload.getOrDefault("verificationUrl", "");
             case "USER_PASSWORD_CHANGED" -> "Your password was changed. If this was not you, contact support immediately.";
             case "CHARGING_SESSION_STARTED" -> "Your charging session has started.";
             case "CHARGING_SESSION_STOPPED" -> "Your charging session has stopped.";
