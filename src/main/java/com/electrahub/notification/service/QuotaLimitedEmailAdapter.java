@@ -48,13 +48,13 @@ public class QuotaLimitedEmailAdapter implements ChannelAdapter {
     @Override
     public DispatchResult dispatch(NotificationMessage message) {
         if (!enabled) {
-            return DispatchResult.failure("ses-email", "EMAIL_DISABLED");
+            return DispatchResult.skipped("email", "EMAIL_DISABLED");
         }
 
         OffsetDateTime since = OffsetDateTime.now(clock).minus(QUOTA_WINDOW);
         long attemptsInWindow = notificationRepository.countAttemptedSince(Channel.EMAIL, since);
         if (attemptsInWindow >= dailyLimit) {
-            return DispatchResult.failure("ses-email", "EMAIL_DAILY_QUOTA_EXCEEDED rollingWindowHours=24 limit=" + dailyLimit);
+            return DispatchResult.skipped("email", "EMAIL_DAILY_QUOTA_EXCEEDED rollingWindowHours=24 limit=" + dailyLimit);
         }
 
         throttle();

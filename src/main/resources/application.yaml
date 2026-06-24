@@ -67,6 +67,19 @@ notification:
       daily-limit: ${NOTIFICATION_CHANNEL_EMAIL_DAILY_LIMIT:59}
       rate-per-second: ${NOTIFICATION_CHANNEL_EMAIL_RATE_PER_SECOND:1}
       retry-enabled: ${NOTIFICATION_CHANNEL_EMAIL_RETRY_ENABLED:false}
+      provider: ${NOTIFICATION_CHANNEL_EMAIL_PROVIDER:smtp-email}
+      smtp:
+        host: ${NOTIFICATION_EMAIL_SMTP_HOST:}
+        port: ${NOTIFICATION_EMAIL_SMTP_PORT:587}
+        username: ${NOTIFICATION_EMAIL_SMTP_USERNAME:}
+        password: ${NOTIFICATION_EMAIL_SMTP_PASSWORD:}
+        from-email: ${NOTIFICATION_EMAIL_SMTP_FROM_EMAIL:no-reply@electrahub.net}
+        from-name: ${NOTIFICATION_EMAIL_SMTP_FROM_NAME:ElectraHub}
+        starttls-enabled: ${NOTIFICATION_EMAIL_SMTP_STARTTLS_ENABLED:true}
+        auth-enabled: ${NOTIFICATION_EMAIL_SMTP_AUTH_ENABLED:true}
+        connection-timeout-ms: ${NOTIFICATION_EMAIL_SMTP_CONNECTION_TIMEOUT_MS:10000}
+        timeout-ms: ${NOTIFICATION_EMAIL_SMTP_TIMEOUT_MS:10000}
+        write-timeout-ms: ${NOTIFICATION_EMAIL_SMTP_WRITE_TIMEOUT_MS:10000}
     sms:
       real-send-enabled: ${NOTIFICATION_CHANNEL_SMS_REAL_SEND_ENABLED:false}
     push:

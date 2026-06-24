@@ -29,11 +29,45 @@ Email quota controls:
 | Setting | Default | Purpose |
 | --- | --- | --- |
 | `NOTIFICATION_CHANNEL_EMAIL_REAL_SEND_ENABLED` | `false` | Keeps email delivery disabled unless explicitly enabled. |
+| `NOTIFICATION_CHANNEL_EMAIL_PROVIDER` | `smtp-email` | Provider label stored with dispatched messages. |
 | `NOTIFICATION_CHANNEL_EMAIL_RATE_PER_SECOND` | `1` | Limits email dispatch spacing to one message per second. |
 | `NOTIFICATION_CHANNEL_EMAIL_DAILY_LIMIT` | `59` | Rolling 24-hour app-side cap. Dev uses `59`, prod uses `150`. |
 | `NOTIFICATION_CHANNEL_EMAIL_RETRY_ENABLED` | `false` | Documents the no-retry policy; failed email dispatches are marked failed and ignored. |
+| `NOTIFICATION_EMAIL_SMTP_HOST` | empty | SMTP server host. Leave empty until credentials are ready. |
+| `NOTIFICATION_EMAIL_SMTP_PORT` | `587` | SMTP submission port. |
+| `NOTIFICATION_EMAIL_SMTP_USERNAME` | empty | SMTP username/API login. Store as a Kubernetes Secret. |
+| `NOTIFICATION_EMAIL_SMTP_PASSWORD` | empty | SMTP password/API key. Store as a Kubernetes Secret. |
+| `NOTIFICATION_EMAIL_SMTP_FROM_EMAIL` | `no-reply@electrahub.net` | Sender address used for outbound transactional email. |
+| `NOTIFICATION_EMAIL_SMTP_FROM_NAME` | `ElectraHub` | Sender display name. |
+| `NOTIFICATION_EMAIL_SMTP_STARTTLS_ENABLED` | `true` | Enables STARTTLS for port 587 providers. |
+| `NOTIFICATION_EMAIL_SMTP_AUTH_ENABLED` | `true` | Enables SMTP authentication. |
 
 The daily cap is evaluated over the previous 24 hours from the notification database, so pod restarts do not reset the quota. Failed or disabled email dispatches are not requeued by the Rabbit listener.
+
+Email is delivered through a provider-neutral SMTP adapter. Disabled email and quota-exceeded email are recorded as `SKIPPED`; SMTP provider errors are recorded as `FAILED` and are not retried.
+
+Recommended low-cost setup:
+
+1. Use Cloudflare DNS/Email Routing for the domain and inbound aliases.
+2. Use a transactional SMTP provider for outbound email. Brevo, Resend, or AWS SES are good starting options; Brevo's free quota is usually easiest for low-volume SMTP.
+3. Verify `electrahub.net` or a sending subdomain in the provider, then add the provider's SPF/DKIM/DMARC DNS records in Cloudflare.
+4. Create an SMTP/API key in the provider.
+5. Store the SMTP credentials in Kubernetes, then enable real sending only after DNS verification is complete.
+
+Example Kubernetes secret:
+
+```powershell
+wsl -d Ubuntu-24.04 -- kubectl -n dev create secret generic notification-email-secret --from-literal=NOTIFICATION_EMAIL_SMTP_USERNAME='<smtp-username>' --from-literal=NOTIFICATION_EMAIL_SMTP_PASSWORD='<smtp-password-or-api-key>' --dry-run=client -o yaml | wsl -d Ubuntu-24.04 -- kubectl apply -f -
+wsl -d Ubuntu-24.04 -- kubectl -n prod create secret generic notification-email-secret --from-literal=NOTIFICATION_EMAIL_SMTP_USERNAME='<smtp-username>' --from-literal=NOTIFICATION_EMAIL_SMTP_PASSWORD='<smtp-password-or-api-key>' --dry-run=client -o yaml | wsl -d Ubuntu-24.04 -- kubectl apply -f -
+```
+
+After the secret exists, wire the secret into the Helm values and set:
+
+```yaml
+NOTIFICATION_CHANNEL_EMAIL_REAL_SEND_ENABLED: "true"
+NOTIFICATION_EMAIL_SMTP_HOST: "smtp-relay.brevo.com"
+NOTIFICATION_EMAIL_SMTP_PORT: "587"
+```
 
 Firebase push notification controls:
 
