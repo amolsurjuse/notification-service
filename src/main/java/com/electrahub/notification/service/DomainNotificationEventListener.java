@@ -70,7 +70,7 @@ public class DomainNotificationEventListener {
         return switch (eventType) {
             case "USER_ACCOUNT_CREATED", "USER_PASSWORD_CHANGED" -> List.of(Channel.EMAIL, Channel.PUSH);
             case "USER_PASSWORD_RESET_REQUESTED", "USER_EMAIL_VERIFICATION_REQUESTED" -> List.of(Channel.EMAIL);
-            case "CHARGING_SESSION_STARTED", "CHARGING_SESSION_STOPPED", "CHARGING_BATTERY_FULL",
+            case "CHARGING_SESSION_STARTED", "CHARGING_SESSION_STOPPED", "CHARGING_SESSION_START_TIMEOUT", "CHARGING_BATTERY_FULL",
                  "CHARGING_IDLE_WARNING", "CHARGING_IDLE_STARTED" -> List.of(Channel.PUSH);
             case "PAYMENT_RECEIPT_READY", "CHARGING_RECEIPT_READY" -> List.of(Channel.EMAIL);
             case "SUPPORT_CONTACT_CREATED", "SUPPORT_ESCALATION_CREATED" -> List.of(Channel.EMAIL);
@@ -90,6 +90,7 @@ public class DomainNotificationEventListener {
             case "USER_EMAIL_VERIFICATION_REQUESTED" -> "Verify your ElectraHub email";
             case "CHARGING_SESSION_STARTED" -> "Charging session started";
             case "CHARGING_SESSION_STOPPED" -> "Charging session stopped";
+            case "CHARGING_SESSION_START_TIMEOUT" -> "Charging could not start";
             case "CHARGING_BATTERY_FULL" -> "Battery full";
             case "CHARGING_IDLE_WARNING" -> "Idle fees may start soon";
             case "CHARGING_IDLE_STARTED" -> "Idle period started";
@@ -106,6 +107,7 @@ public class DomainNotificationEventListener {
             case "USER_PASSWORD_CHANGED" -> "Your password was changed. If this was not you, contact support immediately.";
             case "CHARGING_SESSION_STARTED" -> "Your charging session has started.";
             case "CHARGING_SESSION_STOPPED" -> "Your charging session has stopped.";
+            case "CHARGING_SESSION_START_TIMEOUT" -> "The charger did not start in time. Please try another connector or contact support.";
             case "CHARGING_BATTERY_FULL" -> "Your vehicle battery is full.";
             case "CHARGING_IDLE_WARNING" -> "Please move your vehicle soon to avoid idle fees.";
             case "CHARGING_IDLE_STARTED" -> "Your idle period has started.";

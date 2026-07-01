@@ -185,12 +185,14 @@ public class NotificationOrchestrator {
                 ContactStatus.ACTIVE
         );
         if (devices.isEmpty()) {
+            log.info("Push notification {} skipped for recipient {} because no active Firebase devices are registered", request.templateId(), request.recipientRef());
             NotificationMessage message = notificationRepository
                     .findByIdempotencyKeyAndChannelAndRecipientRef(idempotencyKey, Channel.PUSH, request.recipientRef())
                     .orElseGet(() -> createSkippedMessage(request, idempotencyKey, Channel.PUSH, request.recipientRef(), "NO_ACTIVE_PUSH_DEVICE"));
             return List.of(NotificationMapper.toResponse(message));
         }
 
+        log.info("Creating push notification {} for recipient {} across {} active Firebase device(s)", request.templateId(), request.recipientRef(), devices.size());
         List<NotificationDtos.NotificationResponse> responses = new ArrayList<>();
         for (PushDeviceRegistration device : devices) {
             String childKey = childPushIdempotencyKey(idempotencyKey, device.getDeviceId());
