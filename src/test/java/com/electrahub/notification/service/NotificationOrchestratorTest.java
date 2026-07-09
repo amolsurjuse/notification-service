@@ -48,7 +48,8 @@ class NotificationOrchestratorTest {
                 new ObjectMapper(),
                 new PrivacyHashService("salt"),
                 "notifications.events",
-                "notifications.dispatch"
+                "notifications.dispatch",
+                "support@electrahub.net"
         );
         when(notificationRepository.findByIdempotencyKeyAndChannelAndRecipientRef(any(), any(), any()))
                 .thenReturn(Optional.empty());
@@ -83,7 +84,8 @@ class NotificationOrchestratorTest {
                 new ObjectMapper(),
                 new PrivacyHashService("salt"),
                 "notifications.events",
-                "notifications.dispatch"
+                "notifications.dispatch",
+                "support@electrahub.net"
         );
         NotificationMessage existing = new NotificationMessage("tenant-1", "event-1", "key-1", "user-1", Channel.IN_APP, "template");
         when(notificationRepository.findByIdempotencyKeyAndChannelAndRecipientRef("key-1", Channel.IN_APP, "user-1"))
@@ -118,7 +120,8 @@ class NotificationOrchestratorTest {
                 new ObjectMapper(),
                 new PrivacyHashService("salt"),
                 "notifications.events",
-                "notifications.dispatch"
+                "notifications.dispatch",
+                "support@electrahub.net"
         );
         when(pushDeviceRepository.findByTenantIdAndUserIdAndProviderAndDeviceId("tenant-1", "user-1", "firebase", "device-1"))
                 .thenReturn(Optional.empty());
@@ -150,7 +153,8 @@ class NotificationOrchestratorTest {
                 new ObjectMapper(),
                 new PrivacyHashService("salt"),
                 "notifications.events",
-                "notifications.dispatch"
+                "notifications.dispatch",
+                "support@electrahub.net"
         );
         PushDeviceRegistration device = new PushDeviceRegistration("tenant-1", "user-1", "device-1", "ios", "firebase");
         device.updateToken("firebase-token", "hash", "fire...oken");
@@ -176,5 +180,51 @@ class NotificationOrchestratorTest {
         assertThat(responses).hasSize(1);
         assertThat(responses.get(0).recipientRef()).isEqualTo("device-1");
         verify(rabbitTemplate).convertAndSend(eq("notifications.events"), eq("notifications.dispatch"), any(DispatchCommand.class));
+    }
+
+    @Test
+    void submitProjectBriefCreatesInboxAndEmailForSupportRecipient() {
+        NotificationOrchestrator orchestrator = new NotificationOrchestrator(
+                notificationRepository,
+                contactRepository,
+                pushDeviceRepository,
+                rabbitTemplate,
+                new ObjectMapper(),
+                new PrivacyHashService("salt"),
+                "notifications.events",
+                "notifications.dispatch",
+                "support@electrahub.net"
+        );
+        when(notificationRepository.findByIdempotencyKeyAndChannelAndRecipientRef(any(), any(), eq("support@electrahub.net")))
+                .thenReturn(Optional.empty());
+        when(notificationRepository.save(any(NotificationMessage.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = orchestrator.submitProjectBrief(new NotificationDtos.ProjectBriefSubmissionRequest(
+                "Amol Surjuse",
+                "amol@example.com",
+                "ElectraHub",
+                "+1 555 0100",
+                "Fleet depot",
+                "We need a two-phase charging rollout plan for a mixed AC/DC site.",
+                "org-page-contact",
+                true,
+                "google",
+                "cpc",
+                "fleet",
+                ""
+        ), "203.0.113.10");
+
+        assertThat(response.status()).isEqualTo("ACCEPTED");
+        assertThat(response.referenceId()).startsWith("project-brief-");
+        assertThat(response.notifications()).hasSize(2);
+        assertThat(response.notifications()).anySatisfy(notification -> {
+            assertThat(notification.channel()).isEqualTo(Channel.IN_APP);
+            assertThat(notification.recipientRef()).isEqualTo("support@electrahub.net");
+            assertThat(notification.subject()).isEqualTo("New ElectraHub project brief");
+            assertThat(notification.body()).contains("two-phase charging rollout");
+            assertThat(notification.payloadJson()).contains("\"siteType\":\"Fleet depot\"");
+        });
+        verify(rabbitTemplate, times(2)).convertAndSend(eq("notifications.events"), eq("notifications.dispatch"), any(DispatchCommand.class));
     }
 }

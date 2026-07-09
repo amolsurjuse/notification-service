@@ -39,6 +39,8 @@ public final class NotificationDtos {
             Channel channel,
             String templateId,
             String subject,
+            String body,
+            String payloadJson,
             DeliveryStatus status,
             OffsetDateTime createdAt,
             OffsetDateTime dispatchedAt,
@@ -100,7 +102,23 @@ public final class NotificationDtos {
     ) {
     }
 
-    public record AcceptedResponse(String status, String message, List<NotificationResponse> notifications) {
+    public record ProjectBriefSubmissionRequest(
+            @NotBlank @Size(max = 160) String name,
+            @NotBlank @Email @Size(max = 240) String email,
+            @Size(max = 160) String company,
+            @Size(max = 40) String phone,
+            @NotBlank @Size(max = 120) String siteType,
+            @NotBlank @Size(min = 10, max = 4000) String brief,
+            @Size(max = 120) String sourcePage,
+            Boolean marketingConsent,
+            @Size(max = 160) String utmSource,
+            @Size(max = 160) String utmMedium,
+            @Size(max = 160) String utmCampaign,
+            @Size(max = 200) String honeypot
+    ) {
+    }
+
+    public record AcceptedResponse(String status, String message, String referenceId, List<NotificationResponse> notifications) {
     }
 
     public record DomainNotificationEvent(

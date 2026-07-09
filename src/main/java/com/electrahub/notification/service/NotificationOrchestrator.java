@@ -22,6 +22,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -40,6 +41,7 @@ public class NotificationOrchestrator {
     private final PrivacyHashService privacyHashService;
     private final String exchange;
     private final String dispatchRoutingKey;
+    private final List<String> contactRecipients;
 
     public NotificationOrchestrator(
             NotificationMessageRepository notificationRepository,
@@ -49,7 +51,8 @@ public class NotificationOrchestrator {
             ObjectMapper objectMapper,
             PrivacyHashService privacyHashService,
             @Value("${notification.broker.exchange}") String exchange,
-            @Value("${notification.broker.dispatch-routing-key}") String dispatchRoutingKey
+            @Value("${notification.broker.dispatch-routing-key}") String dispatchRoutingKey,
+            @Value("${notification.contact.recipients:support@electrahub.net}") String contactRecipients
     ) {
         this.notificationRepository = notificationRepository;
         this.contactRepository = contactRepository;
@@ -59,6 +62,7 @@ public class NotificationOrchestrator {
         this.privacyHashService = privacyHashService;
         this.exchange = exchange;
         this.dispatchRoutingKey = dispatchRoutingKey;
+        this.contactRecipients = parseRecipients(contactRecipients);
     }
 
     @Transactional
@@ -163,18 +167,78 @@ public class NotificationOrchestrator {
                 "message", request.message(),
                 "ipHash", privacyHashService.sha256(defaultString(ipAddress))
         );
-        NotificationDtos.SubmitNotificationRequest submit = new NotificationDtos.SubmitNotificationRequest(
-                "electrahub",
+        List<NotificationDtos.NotificationResponse> responses = submitForContactRecipients(
                 eventId,
-                eventId,
-                "support@electrahub.net",
-                List.of(Channel.IN_APP, Channel.EMAIL),
                 "contact-form-submission",
                 "New ElectraHub contact request",
                 request.message(),
                 payload
         );
-        return new NotificationDtos.AcceptedResponse("ACCEPTED", "Contact request accepted for async processing", submit(submit));
+        return new NotificationDtos.AcceptedResponse("ACCEPTED", "Contact request accepted for async processing", eventId, responses);
+    }
+
+    @Transactional
+    public NotificationDtos.AcceptedResponse submitProjectBrief(NotificationDtos.ProjectBriefSubmissionRequest request, String ipAddress) {
+        if (trimToNull(request.honeypot()) != null) {
+            throw new IllegalArgumentException("Invalid project brief submission");
+        }
+        String normalizedEmail = request.email().toLowerCase(Locale.ROOT);
+        String eventId = "project-brief-" + privacyHashService.sha256(normalizedEmail + ":" + request.brief());
+        Map<String, Object> payload = Map.ofEntries(
+                Map.entry("name", request.name()),
+                Map.entry("emailHash", privacyHashService.sha256(normalizedEmail)),
+                Map.entry("emailMasked", privacyHashService.maskEmail(request.email())),
+                Map.entry("company", defaultString(request.company())),
+                Map.entry("phone", defaultString(request.phone())),
+                Map.entry("siteType", request.siteType()),
+                Map.entry("brief", request.brief()),
+                Map.entry("sourcePage", defaultString(request.sourcePage())),
+                Map.entry("marketingConsent", Boolean.TRUE.equals(request.marketingConsent())),
+                Map.entry("utmSource", defaultString(request.utmSource())),
+                Map.entry("utmMedium", defaultString(request.utmMedium())),
+                Map.entry("utmCampaign", defaultString(request.utmCampaign())),
+                Map.entry("ipHash", privacyHashService.sha256(defaultString(ipAddress)))
+        );
+        String subject = "New ElectraHub project brief";
+        String body = request.brief();
+        List<NotificationDtos.NotificationResponse> responses = submitForContactRecipients(
+                eventId,
+                "project-brief-submission",
+                subject,
+                body,
+                payload
+        );
+        return new NotificationDtos.AcceptedResponse(
+                "ACCEPTED",
+                "Thanks " + request.name() + " — we received your project brief and will follow up shortly.",
+                eventId,
+                responses
+        );
+    }
+
+    private List<NotificationDtos.NotificationResponse> submitForContactRecipients(
+            String eventId,
+            String templateId,
+            String subject,
+            String body,
+            Map<String, Object> payload
+    ) {
+        List<NotificationDtos.NotificationResponse> responses = new ArrayList<>();
+        for (String recipient : contactRecipients) {
+            NotificationDtos.SubmitNotificationRequest submit = new NotificationDtos.SubmitNotificationRequest(
+                    "electrahub",
+                    eventId,
+                    eventId + ":" + recipient,
+                    recipient,
+                    List.of(Channel.IN_APP, Channel.EMAIL),
+                    templateId,
+                    subject,
+                    body,
+                    payload
+            );
+            responses.addAll(submit(submit));
+        }
+        return responses;
     }
 
     private List<NotificationDtos.NotificationResponse> createPushMessages(NotificationDtos.SubmitNotificationRequest request, String idempotencyKey) {
@@ -311,5 +375,14 @@ public class NotificationOrchestrator {
 
     private String defaultString(String value) {
         return value == null ? "" : value;
+    }
+
+    private List<String> parseRecipients(String recipients) {
+        List<String> parsed = Arrays.stream(defaultString(recipients).split(","))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .distinct()
+                .toList();
+        return parsed.isEmpty() ? List.of("support@electrahub.net") : parsed;
     }
 }

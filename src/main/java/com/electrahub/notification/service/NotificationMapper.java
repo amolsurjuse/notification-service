@@ -17,6 +17,8 @@ public final class NotificationMapper {
                 message.getChannel(),
                 message.getTemplateId(),
                 message.getSubject(),
+                message.getBody(),
+                message.getPayloadJson(),
                 message.getStatus(),
                 message.getCreatedAt(),
                 message.getDispatchedAt(),

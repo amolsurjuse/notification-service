@@ -70,6 +70,14 @@ public class NotificationController {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(orchestrator.submitContact(request, clientIp(servletRequest)));
     }
 
+    @PostMapping("/public/contact-inquiries")
+    public ResponseEntity<NotificationDtos.AcceptedResponse> projectBrief(
+            @Valid @RequestBody NotificationDtos.ProjectBriefSubmissionRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(orchestrator.submitProjectBrief(request, clientIp(servletRequest)));
+    }
+
     private String clientIp(HttpServletRequest request) {
         String forwardedFor = request.getHeader("X-Forwarded-For");
         if (forwardedFor != null && !forwardedFor.isBlank()) {
