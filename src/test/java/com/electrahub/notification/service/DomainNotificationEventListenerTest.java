@@ -30,14 +30,11 @@ class DomainNotificationEventListenerTest {
 
         ArgumentCaptor<NotificationDtos.SubmitNotificationRequest> requests =
                 ArgumentCaptor.forClass(NotificationDtos.SubmitNotificationRequest.class);
-        verify(orchestrator, times(2)).submit(requests.capture());
+        verify(orchestrator, times(4)).submit(requests.capture());
 
         assertThat(requests.getAllValues())
                 .extracting(NotificationDtos.SubmitNotificationRequest::idempotencyKey)
-                .containsExactly(
-                        requests.getAllValues().get(0).idempotencyKey(),
-                        requests.getAllValues().get(0).idempotencyKey()
-                );
+                .containsOnly(requests.getAllValues().get(0).idempotencyKey());
         assertThat(requests.getAllValues().get(0).idempotencyKey()).startsWith("charging:");
     }
 
@@ -64,7 +61,7 @@ class DomainNotificationEventListenerTest {
     }
 
     @Test
-    void lowBalanceStopCreatesPushNotification() {
+    void lowBalanceStopCreatesPushAndInboxNotifications() {
         DomainNotificationEventListener listener = listener();
         when(orchestrator.submit(any())).thenReturn(List.of());
 
@@ -72,10 +69,18 @@ class DomainNotificationEventListenerTest {
 
         ArgumentCaptor<NotificationDtos.SubmitNotificationRequest> request =
                 ArgumentCaptor.forClass(NotificationDtos.SubmitNotificationRequest.class);
-        verify(orchestrator).submit(request.capture());
-        assertThat(request.getValue().channels()).containsExactly(com.electrahub.notification.domain.Channel.PUSH);
-        assertThat(request.getValue().templateId()).isEqualTo("charging-low-balance-stop");
-        assertThat(request.getValue().subject()).containsIgnoringCase("low balance");
+        verify(orchestrator, times(2)).submit(request.capture());
+        assertThat(request.getAllValues())
+                .extracting(value -> value.channels().get(0))
+                .containsExactly(
+                        com.electrahub.notification.domain.Channel.PUSH,
+                        com.electrahub.notification.domain.Channel.IN_APP
+                );
+        assertThat(request.getAllValues()).allSatisfy(value -> {
+            assertThat(value.recipientRef()).isEqualTo("user-1");
+            assertThat(value.templateId()).isEqualTo("charging-low-balance-stop");
+            assertThat(value.subject()).containsIgnoringCase("low balance");
+        });
     }
 
     private DomainNotificationEventListener listener() {

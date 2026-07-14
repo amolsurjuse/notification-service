@@ -150,3 +150,26 @@ databaseChangeLog:
               - column: { name: channel }
               - column: { name: status }
               - column: { name: dispatched_at }
+
+  - changeSet:
+      id: 007-index-driver-inbox
+      author: notification-service
+      changes:
+        - createIndex:
+            schemaName: notification
+            tableName: notifications
+            indexName: idx_notifications_driver_inbox
+            columns:
+              - column: { name: tenant_id }
+              - column: { name: recipient_ref }
+              - column: { name: channel }
+              - column: { name: created_at }
+        - createIndex:
+            schemaName: notification
+            tableName: notifications
+            indexName: idx_notifications_driver_unread
+            columns:
+              - column: { name: tenant_id }
+              - column: { name: recipient_ref }
+              - column: { name: channel }
+              - column: { name: read_at }

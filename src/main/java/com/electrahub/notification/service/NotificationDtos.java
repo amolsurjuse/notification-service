@@ -49,6 +49,45 @@ public final class NotificationDtos {
     ) {
     }
 
+    public enum InboxReadState {
+        ALL,
+        UNREAD,
+        READ;
+
+        public static InboxReadState from(String value) {
+            if (value == null || value.isBlank()) {
+                return ALL;
+            }
+            try {
+                return valueOf(value.trim().toUpperCase());
+            } catch (IllegalArgumentException ex) {
+                throw new IllegalArgumentException("state must be one of: all, unread, read");
+            }
+        }
+    }
+
+    public record InboxPageResponse(
+            List<NotificationResponse> items,
+            int page,
+            int size,
+            long totalElements,
+            int totalPages,
+            boolean hasMore,
+            long unreadCount
+    ) {
+    }
+
+    public record InboxMutationResponse(int affectedCount, long unreadCount) {
+    }
+
+    public record InboxRealtimeResponse(
+            String type,
+            NotificationResponse notification,
+            long unreadCount,
+            OffsetDateTime occurredAt
+    ) {
+    }
+
     public record ContactRegistrationRequest(
             @NotBlank String tenantId,
             @NotBlank String userId,

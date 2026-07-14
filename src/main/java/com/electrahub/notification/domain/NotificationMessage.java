@@ -149,6 +149,16 @@ public class NotificationMessage {
 
     public void markRead() {
         this.status = DeliveryStatus.READ;
-        this.readAt = OffsetDateTime.now();
+        if (this.readAt == null) {
+            this.readAt = OffsetDateTime.now();
+        }
+    }
+
+    public void markUnread() {
+        if (channel != Channel.IN_APP) {
+            throw new IllegalStateException("Only in-app notifications can be marked unread");
+        }
+        this.status = DeliveryStatus.DELIVERED;
+        this.readAt = null;
     }
 }

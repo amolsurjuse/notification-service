@@ -1,10 +1,12 @@
 package com.electrahub.notification.web;
 
 import com.electrahub.notification.service.NotificationDtos;
+import com.electrahub.notification.service.InboxRealtimeService;
 import com.electrahub.notification.service.NotificationOrchestrator;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.UUID;
@@ -27,9 +30,11 @@ public class NotificationController {
     static final String AUTHENTICATED_TENANT_HEADER = "X-ElectraHub-Tenant-Id";
 
     private final NotificationOrchestrator orchestrator;
+    private final InboxRealtimeService inboxRealtimeService;
 
-    public NotificationController(NotificationOrchestrator orchestrator) {
+    public NotificationController(NotificationOrchestrator orchestrator, InboxRealtimeService inboxRealtimeService) {
         this.orchestrator = orchestrator;
+        this.inboxRealtimeService = inboxRealtimeService;
     }
 
     @PostMapping("/notifications")
@@ -45,6 +50,57 @@ public class NotificationController {
     @PatchMapping("/inbox/{id}/read")
     public NotificationDtos.NotificationResponse markRead(@PathVariable UUID id, @RequestParam String recipientRef) {
         return orchestrator.markRead(id, recipientRef);
+    }
+
+    @GetMapping("/me/inbox")
+    public NotificationDtos.InboxPageResponse myInbox(
+            @RequestHeader(AUTHENTICATED_TENANT_HEADER) String tenantId,
+            @RequestHeader(AUTHENTICATED_USER_HEADER) String userId,
+            @RequestParam(defaultValue = "all") String state,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "30") int size
+    ) {
+        return orchestrator.inboxForUser(
+                tenantId,
+                userId,
+                NotificationDtos.InboxReadState.from(state),
+                page,
+                size
+        );
+    }
+
+    @PatchMapping("/me/inbox/{id}/read")
+    public NotificationDtos.NotificationResponse markMyNotificationRead(
+            @PathVariable UUID id,
+            @RequestHeader(AUTHENTICATED_TENANT_HEADER) String tenantId,
+            @RequestHeader(AUTHENTICATED_USER_HEADER) String userId
+    ) {
+        return orchestrator.setInboxReadState(id, tenantId, userId, true);
+    }
+
+    @PatchMapping("/me/inbox/{id}/unread")
+    public NotificationDtos.NotificationResponse markMyNotificationUnread(
+            @PathVariable UUID id,
+            @RequestHeader(AUTHENTICATED_TENANT_HEADER) String tenantId,
+            @RequestHeader(AUTHENTICATED_USER_HEADER) String userId
+    ) {
+        return orchestrator.setInboxReadState(id, tenantId, userId, false);
+    }
+
+    @PatchMapping("/me/inbox/read-all")
+    public NotificationDtos.InboxMutationResponse markMyInboxRead(
+            @RequestHeader(AUTHENTICATED_TENANT_HEADER) String tenantId,
+            @RequestHeader(AUTHENTICATED_USER_HEADER) String userId
+    ) {
+        return orchestrator.markAllInboxRead(tenantId, userId);
+    }
+
+    @GetMapping(value = "/me/inbox/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamMyInbox(
+            @RequestHeader(AUTHENTICATED_TENANT_HEADER) String tenantId,
+            @RequestHeader(AUTHENTICATED_USER_HEADER) String userId
+    ) {
+        return inboxRealtimeService.connect(tenantId, userId);
     }
 
     @PostMapping("/contacts")

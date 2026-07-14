@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -52,31 +51,48 @@ public class DomainNotificationEventListener {
                 payload.put("resetUrl", driverResetPasswordUrl + "?token=" + token);
             }
 
-            NotificationDtos.SubmitNotificationRequest request = new NotificationDtos.SubmitNotificationRequest(
-                    event.tenantId(),
-                    event.eventId(),
-                    idempotencyKeyFor(event, payload),
-                    event.recipientRef(),
-                    channels,
-                    templateFor(event.eventType()),
-                    subjectFor(event.eventType(), payload),
-                    bodyFor(event.eventType(), payload),
-                    payload
-            );
-            orchestrator.submit(request);
+            for (Channel channel : channels) {
+                String recipientRef = recipientFor(event, channel);
+                if (recipientRef == null) {
+                    log.warn("Ignoring {} channel for event {} because no recipient is available", channel, event.eventType());
+                    continue;
+                }
+                NotificationDtos.SubmitNotificationRequest request = new NotificationDtos.SubmitNotificationRequest(
+                        event.tenantId(),
+                        event.eventId(),
+                        idempotencyKeyFor(event, payload),
+                        recipientRef,
+                        List.of(channel),
+                        templateFor(event.eventType()),
+                        subjectFor(event.eventType(), payload),
+                        bodyFor(event.eventType(), payload),
+                        payload
+                );
+                orchestrator.submit(request);
+            }
         });
     }
 
     private List<Channel> channelsFor(String eventType) {
         return switch (eventType) {
-            case "USER_ACCOUNT_CREATED", "USER_PASSWORD_CHANGED" -> List.of(Channel.EMAIL, Channel.PUSH);
+            case "USER_ACCOUNT_CREATED", "USER_PASSWORD_CHANGED" -> List.of(Channel.EMAIL, Channel.PUSH, Channel.IN_APP);
             case "USER_PASSWORD_RESET_REQUESTED", "USER_EMAIL_VERIFICATION_REQUESTED" -> List.of(Channel.EMAIL);
             case "CHARGING_SESSION_STARTED", "CHARGING_SESSION_STOPPED", "CHARGING_SESSION_START_TIMEOUT", "CHARGING_BATTERY_FULL",
-                 "CHARGING_IDLE_WARNING", "CHARGING_IDLE_STARTED", "CHARGING_LOW_BALANCE_STOP" -> List.of(Channel.PUSH);
-            case "PAYMENT_RECEIPT_READY", "CHARGING_RECEIPT_READY" -> List.of(Channel.EMAIL);
+                 "CHARGING_IDLE_WARNING", "CHARGING_IDLE_STARTED", "CHARGING_LOW_BALANCE_STOP" -> List.of(Channel.PUSH, Channel.IN_APP);
+            case "PAYMENT_RECEIPT_READY", "CHARGING_RECEIPT_READY" -> List.of(Channel.EMAIL, Channel.PUSH, Channel.IN_APP);
             case "SUPPORT_CONTACT_CREATED", "SUPPORT_ESCALATION_CREATED" -> List.of(Channel.EMAIL);
             default -> List.of();
         };
+    }
+
+    private String recipientFor(NotificationDtos.DomainNotificationEvent event, Channel channel) {
+        if (channel == Channel.PUSH || channel == Channel.IN_APP) {
+            String userId = text(event.userId());
+            if (userId != null) {
+                return userId;
+            }
+        }
+        return text(event.recipientRef());
     }
 
     private String templateFor(String eventType) {

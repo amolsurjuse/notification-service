@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.OffsetDateTime;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
@@ -27,6 +28,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> invalid(IllegalArgumentException ex) {
         return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", ex.getMessage());
+    }
+
+    @ExceptionHandler(NoSuchElementException.class)
+    public ResponseEntity<Map<String, Object>> notFound(NoSuchElementException ex) {
+        return error(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

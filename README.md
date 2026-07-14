@@ -21,8 +21,23 @@ The service uses:
 
 - Postgres schema `notification`
 - RabbitMQ queue `notifications.dispatch`
+- RabbitMQ fan-out exchange `notifications.realtime`
 - Context path `/notifications`
 - Real provider sending disabled by default until credentials and sandbox tests are complete
+
+## Driver inbox
+
+Authenticated driver clients use the gateway-managed identity headers; they never submit a recipient ID.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/v1/me/inbox?state=all&page=0&size=30` | Page through the current user's durable in-app notifications. `state` accepts `all`, `unread`, or `read`. |
+| `PATCH` | `/api/v1/me/inbox/{id}/read` | Mark one notification read. |
+| `PATCH` | `/api/v1/me/inbox/{id}/unread` | Mark one notification unread. |
+| `PATCH` | `/api/v1/me/inbox/read-all` | Mark every unread notification read. |
+| `GET` | `/api/v1/me/inbox/stream` | Receive `READY`, `CREATED`, `UPDATED`, and `READ_ALL` events over SSE. |
+
+REST is the source of truth. The SSE exchange uses one exclusive RabbitMQ queue per service instance so live changes reach clients connected to any replica; clients reload REST state after reconnecting.
 
 Email quota controls:
 

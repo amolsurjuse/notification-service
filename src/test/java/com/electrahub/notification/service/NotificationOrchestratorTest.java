@@ -2,6 +2,7 @@ package com.electrahub.notification.service;
 
 import com.electrahub.notification.domain.Channel;
 import com.electrahub.notification.domain.ContactStatus;
+import com.electrahub.notification.domain.DeliveryStatus;
 import com.electrahub.notification.domain.NotificationMessage;
 import com.electrahub.notification.domain.PushDeviceRegistration;
 import com.electrahub.notification.repository.NotificationMessageRepository;
@@ -14,10 +15,13 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -37,6 +41,8 @@ class NotificationOrchestratorTest {
     PushDeviceRegistrationRepository pushDeviceRepository;
     @Mock
     RabbitTemplate rabbitTemplate;
+    @Mock
+    InboxRealtimePublisher inboxRealtimePublisher;
 
     @Test
     void submitCreatesOneNotificationPerDistinctChannelAndQueuesDispatch() {
@@ -47,6 +53,7 @@ class NotificationOrchestratorTest {
                 rabbitTemplate,
                 new ObjectMapper(),
                 new PrivacyHashService("salt"),
+                inboxRealtimePublisher,
                 "notifications.events",
                 "notifications.dispatch",
                 "support@electrahub.net"
@@ -83,6 +90,7 @@ class NotificationOrchestratorTest {
                 rabbitTemplate,
                 new ObjectMapper(),
                 new PrivacyHashService("salt"),
+                inboxRealtimePublisher,
                 "notifications.events",
                 "notifications.dispatch",
                 "support@electrahub.net"
@@ -119,6 +127,7 @@ class NotificationOrchestratorTest {
                 rabbitTemplate,
                 new ObjectMapper(),
                 new PrivacyHashService("salt"),
+                inboxRealtimePublisher,
                 "notifications.events",
                 "notifications.dispatch",
                 "support@electrahub.net"
@@ -153,6 +162,7 @@ class NotificationOrchestratorTest {
                 rabbitTemplate,
                 new ObjectMapper(),
                 new PrivacyHashService("salt"),
+                inboxRealtimePublisher,
                 "notifications.events",
                 "notifications.dispatch",
                 "support@electrahub.net"
@@ -192,6 +202,7 @@ class NotificationOrchestratorTest {
                 rabbitTemplate,
                 new ObjectMapper(),
                 new PrivacyHashService("salt"),
+                inboxRealtimePublisher,
                 "notifications.events",
                 "notifications.dispatch",
                 "support@electrahub.net"
@@ -227,5 +238,73 @@ class NotificationOrchestratorTest {
             assertThat(notification.payloadJson()).contains("\"siteType\":\"Fleet depot\"");
         });
         verify(rabbitTemplate, times(2)).convertAndSend(eq("notifications.events"), eq("notifications.dispatch"), any(DispatchCommand.class));
+    }
+
+    @Test
+    void driverInboxIsTenantScopedAndReturnsUnreadCount() {
+        NotificationOrchestrator orchestrator = orchestrator();
+        NotificationMessage message = new NotificationMessage(
+                "tenant-1", "event-1", "key-1", "user-1", Channel.IN_APP, "charging-session-started");
+        when(notificationRepository.findByTenantIdAndRecipientRefAndChannelAndReadAtIsNull(
+                eq("tenant-1"), eq("user-1"), eq(Channel.IN_APP), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(message)));
+        when(notificationRepository.countByTenantIdAndRecipientRefAndChannelAndReadAtIsNull(
+                "tenant-1", "user-1", Channel.IN_APP)).thenReturn(1L);
+
+        var response = orchestrator.inboxForUser(
+                "tenant-1", "user-1", NotificationDtos.InboxReadState.UNREAD, 0, 30);
+
+        assertThat(response.items()).hasSize(1);
+        assertThat(response.items().get(0).recipientRef()).isEqualTo("user-1");
+        assertThat(response.unreadCount()).isEqualTo(1);
+    }
+
+    @Test
+    void driverCanMarkOwnInboxNotificationReadAndUnread() {
+        NotificationOrchestrator orchestrator = orchestrator();
+        UUID id = UUID.randomUUID();
+        NotificationMessage message = new NotificationMessage(
+                "tenant-1", "event-1", "key-1", "user-1", Channel.IN_APP, "charging-session-started");
+        when(notificationRepository.findByIdAndTenantIdAndRecipientRefAndChannel(
+                id, "tenant-1", "user-1", Channel.IN_APP)).thenReturn(Optional.of(message));
+        when(notificationRepository.save(message)).thenReturn(message);
+
+        var read = orchestrator.setInboxReadState(id, "tenant-1", "user-1", true);
+        var unread = orchestrator.setInboxReadState(id, "tenant-1", "user-1", false);
+
+        assertThat(read.readAt()).isNotNull();
+        assertThat(unread.readAt()).isNull();
+        verify(inboxRealtimePublisher, times(2)).updated(message);
+    }
+
+    @Test
+    void markAllReadPublishesOneRealtimeInvalidation() {
+        NotificationOrchestrator orchestrator = orchestrator();
+        when(notificationRepository.markAllInboxNotificationsRead(
+                eq("tenant-1"), eq("user-1"), eq(Channel.IN_APP), eq(DeliveryStatus.READ), any()))
+                .thenReturn(3);
+        when(notificationRepository.countByTenantIdAndRecipientRefAndChannelAndReadAtIsNull(
+                "tenant-1", "user-1", Channel.IN_APP)).thenReturn(0L);
+
+        var response = orchestrator.markAllInboxRead("tenant-1", "user-1");
+
+        assertThat(response.affectedCount()).isEqualTo(3);
+        assertThat(response.unreadCount()).isZero();
+        verify(inboxRealtimePublisher).readAll("tenant-1", "user-1");
+    }
+
+    private NotificationOrchestrator orchestrator() {
+        return new NotificationOrchestrator(
+                notificationRepository,
+                contactRepository,
+                pushDeviceRepository,
+                rabbitTemplate,
+                new ObjectMapper(),
+                new PrivacyHashService("salt"),
+                inboxRealtimePublisher,
+                "notifications.events",
+                "notifications.dispatch",
+                "support@electrahub.net"
+        );
     }
 }

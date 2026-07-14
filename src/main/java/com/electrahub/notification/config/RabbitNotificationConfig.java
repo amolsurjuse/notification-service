@@ -3,6 +3,8 @@ package com.electrahub.notification.config;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.DirectExchange;
+import org.springframework.amqp.core.FanoutExchange;
+import org.springframework.amqp.core.AnonymousQueue;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.config.RetryInterceptorBuilder;
@@ -95,6 +97,26 @@ public class RabbitNotificationConfig {
             @Value("${notification.broker.domain-event-routing-key}") String routingKey
     ) {
         return BindingBuilder.bind(notificationDomainEventQueue).to(notificationExchange).with(routingKey);
+    }
+
+    @Bean
+    FanoutExchange notificationRealtimeExchange(
+            @Value("${notification.broker.realtime-exchange}") String exchange
+    ) {
+        return new FanoutExchange(exchange, true, false);
+    }
+
+    @Bean
+    AnonymousQueue notificationRealtimeQueue() {
+        return new AnonymousQueue();
+    }
+
+    @Bean
+    Binding notificationRealtimeBinding(
+            @Qualifier("notificationRealtimeExchange") FanoutExchange notificationRealtimeExchange,
+            @Qualifier("notificationRealtimeQueue") AnonymousQueue notificationRealtimeQueue
+    ) {
+        return BindingBuilder.bind(notificationRealtimeQueue).to(notificationRealtimeExchange);
     }
 
     @Bean

@@ -64,6 +64,10 @@ notification:
     dispatch-retry-max-interval-ms: ${NOTIFICATION_BROKER_DISPATCH_RETRY_MAX_INTERVAL_MS:10000}
     domain-event-queue: ${NOTIFICATION_BROKER_DOMAIN_EVENT_QUEUE:notifications.domain-events}
     domain-event-routing-key: ${NOTIFICATION_BROKER_DOMAIN_EVENT_ROUTING_KEY:notifications.domain}
+    realtime-exchange: ${NOTIFICATION_BROKER_REALTIME_EXCHANGE:notifications.realtime}
+  inbox:
+    stream-timeout-ms: ${NOTIFICATION_INBOX_STREAM_TIMEOUT_MS:1800000}
+    heartbeat-ms: ${NOTIFICATION_INBOX_HEARTBEAT_MS:15000}
   contact:
     recipients: ${NOTIFICATION_CONTACT_RECIPIENTS:support@electrahub.net}
     ip-hash-salt: ${NOTIFICATION_CONTACT_IP_HASH_SALT:change-me}

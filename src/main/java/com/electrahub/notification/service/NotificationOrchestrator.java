@@ -3,6 +3,7 @@ package com.electrahub.notification.service;
 import com.electrahub.notification.domain.Channel;
 import com.electrahub.notification.domain.ContactStatus;
 import com.electrahub.notification.domain.ContactType;
+import com.electrahub.notification.domain.DeliveryStatus;
 import com.electrahub.notification.domain.NotificationMessage;
 import com.electrahub.notification.domain.PushDeviceRegistration;
 import com.electrahub.notification.domain.UserContact;
@@ -15,6 +16,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -26,6 +29,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -39,6 +43,7 @@ public class NotificationOrchestrator {
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
     private final PrivacyHashService privacyHashService;
+    private final InboxRealtimePublisher inboxRealtimePublisher;
     private final String exchange;
     private final String dispatchRoutingKey;
     private final List<String> contactRecipients;
@@ -50,6 +55,7 @@ public class NotificationOrchestrator {
             RabbitTemplate rabbitTemplate,
             ObjectMapper objectMapper,
             PrivacyHashService privacyHashService,
+            InboxRealtimePublisher inboxRealtimePublisher,
             @Value("${notification.broker.exchange}") String exchange,
             @Value("${notification.broker.dispatch-routing-key}") String dispatchRoutingKey,
             @Value("${notification.contact.recipients:support@electrahub.net}") String contactRecipients
@@ -60,6 +66,7 @@ public class NotificationOrchestrator {
         this.rabbitTemplate = rabbitTemplate;
         this.objectMapper = objectMapper;
         this.privacyHashService = privacyHashService;
+        this.inboxRealtimePublisher = inboxRealtimePublisher;
         this.exchange = exchange;
         this.dispatchRoutingKey = dispatchRoutingKey;
         this.contactRecipients = parseRecipients(contactRecipients);
@@ -93,15 +100,95 @@ public class NotificationOrchestrator {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public NotificationDtos.InboxPageResponse inboxForUser(
+            String authenticatedTenantId,
+            String authenticatedUserId,
+            NotificationDtos.InboxReadState state,
+            int requestedPage,
+            int requestedSize
+    ) {
+        String tenantId = requiredTrim(authenticatedTenantId, "authenticatedTenantId");
+        String userId = requiredTrim(authenticatedUserId, "authenticatedUserId");
+        int pageNumber = Math.max(0, requestedPage);
+        int pageSize = Math.min(100, Math.max(1, requestedSize));
+        PageRequest pageable = PageRequest.of(
+                pageNumber,
+                pageSize,
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))
+        );
+        var page = switch (state == null ? NotificationDtos.InboxReadState.ALL : state) {
+            case ALL -> notificationRepository.findByTenantIdAndRecipientRefAndChannel(
+                    tenantId, userId, Channel.IN_APP, pageable);
+            case UNREAD -> notificationRepository.findByTenantIdAndRecipientRefAndChannelAndReadAtIsNull(
+                    tenantId, userId, Channel.IN_APP, pageable);
+            case READ -> notificationRepository.findByTenantIdAndRecipientRefAndChannelAndReadAtIsNotNull(
+                    tenantId, userId, Channel.IN_APP, pageable);
+        };
+        return new NotificationDtos.InboxPageResponse(
+                page.getContent().stream().map(NotificationMapper::toResponse).toList(),
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.hasNext(),
+                unreadCount(tenantId, userId)
+        );
+    }
+
     @Transactional
     public NotificationDtos.NotificationResponse markRead(UUID id, String recipientRef) {
         NotificationMessage message = notificationRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Notification not found"));
+                .orElseThrow(() -> new NoSuchElementException("Notification not found"));
         if (!message.getRecipientRef().equals(recipientRef)) {
             throw new IllegalArgumentException("Notification does not belong to recipient");
         }
         message.markRead();
-        return NotificationMapper.toResponse(notificationRepository.save(message));
+        NotificationMessage saved = notificationRepository.save(message);
+        inboxRealtimePublisher.updated(saved);
+        return NotificationMapper.toResponse(saved);
+    }
+
+    @Transactional
+    public NotificationDtos.NotificationResponse setInboxReadState(
+            UUID id,
+            String authenticatedTenantId,
+            String authenticatedUserId,
+            boolean read
+    ) {
+        String tenantId = requiredTrim(authenticatedTenantId, "authenticatedTenantId");
+        String userId = requiredTrim(authenticatedUserId, "authenticatedUserId");
+        NotificationMessage message = notificationRepository.findByIdAndTenantIdAndRecipientRefAndChannel(
+                        id, tenantId, userId, Channel.IN_APP)
+                .orElseThrow(() -> new NoSuchElementException("Notification not found"));
+        if (read) {
+            message.markRead();
+        } else {
+            message.markUnread();
+        }
+        NotificationMessage saved = notificationRepository.save(message);
+        inboxRealtimePublisher.updated(saved);
+        return NotificationMapper.toResponse(saved);
+    }
+
+    @Transactional
+    public NotificationDtos.InboxMutationResponse markAllInboxRead(
+            String authenticatedTenantId,
+            String authenticatedUserId
+    ) {
+        String tenantId = requiredTrim(authenticatedTenantId, "authenticatedTenantId");
+        String userId = requiredTrim(authenticatedUserId, "authenticatedUserId");
+        int affected = notificationRepository.markAllInboxNotificationsRead(
+                tenantId,
+                userId,
+                Channel.IN_APP,
+                DeliveryStatus.READ,
+                OffsetDateTime.now()
+        );
+        if (affected > 0) {
+            inboxRealtimePublisher.readAll(tenantId, userId);
+        }
+        return new NotificationDtos.InboxMutationResponse(affected, unreadCount(tenantId, userId));
     }
 
     @Transactional
@@ -304,6 +391,9 @@ public class NotificationOrchestrator {
         message.setBody(trimToNull(request.body()));
         message.setPayloadJson(toJson(request.payload()));
         NotificationMessage saved = notificationRepository.save(message);
+        if (channel == Channel.IN_APP) {
+            inboxRealtimePublisher.created(saved);
+        }
         publishDispatch(saved.getId());
         return saved;
     }
@@ -355,6 +445,14 @@ public class NotificationOrchestrator {
             return requested;
         }
         return request.eventId() + ":" + request.templateId();
+    }
+
+    private long unreadCount(String tenantId, String userId) {
+        return notificationRepository.countByTenantIdAndRecipientRefAndChannelAndReadAtIsNull(
+                tenantId,
+                userId,
+                Channel.IN_APP
+        );
     }
 
     private String toJson(Map<String, Object> payload) {
