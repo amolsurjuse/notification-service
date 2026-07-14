@@ -60,6 +60,7 @@ class FirebasePushAdapterTest {
 
         assertThat(result.success()).isFalse();
         assertThat(result.error()).isEqualTo("FIREBASE_NOT_CONFIGURED");
+        assertThat(result.retryable()).isTrue();
     }
 
     @Test
@@ -110,7 +111,7 @@ class FirebasePushAdapterTest {
         device.updateToken("registered-token", "hash", "reg...ken");
         when(sender.send(any())).thenReturn("projects/electrahub/messages/456");
         when(repository.countAttemptedSince(eq(Channel.PUSH), any())).thenReturn(0L);
-        when(pushDeviceRepository.findByTenantIdAndProviderAndDeviceIdAndStatus("tenant-1", "firebase", "device-1", ContactStatus.ACTIVE))
+        when(pushDeviceRepository.findFirstByTenantIdAndProviderAndDeviceIdAndStatusOrderByLastSeenAtDesc("tenant-1", "firebase", "device-1", ContactStatus.ACTIVE))
                 .thenReturn(Optional.of(device));
         FirebasePushAdapter adapter = new FirebasePushAdapter(repository, pushDeviceRepository, OBJECT_MAPPER, sender, CLOCK, true, 500, 5);
 
@@ -121,6 +122,22 @@ class FirebasePushAdapterTest {
         assertThat(result.success()).isTrue();
         assertThat(result.providerMessageId()).isEqualTo("projects/electrahub/messages/456");
         verify(sender).send(any(Message.class));
+    }
+
+    @Test
+    void transientProviderFailureIsMarkedRetryable() throws Exception {
+        NotificationMessageRepository repository = mock(NotificationMessageRepository.class);
+        PushDeviceRegistrationRepository pushDeviceRepository = mock(PushDeviceRegistrationRepository.class);
+        FirebasePushSender sender = configuredSender();
+        when(repository.countAttemptedSince(eq(Channel.PUSH), any())).thenReturn(0L);
+        when(sender.send(any())).thenThrow(new IllegalStateException("temporary outage"));
+        FirebasePushAdapter adapter = new FirebasePushAdapter(repository, pushDeviceRepository, OBJECT_MAPPER, sender, CLOCK, true, 500, 5);
+
+        DispatchResult result = adapter.dispatch(message("{\"fcmToken\":\"token-1\"}"));
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.retryable()).isTrue();
+        assertThat(result.error()).contains("temporary outage");
     }
 
     private NotificationMessage message(String payloadJson) {

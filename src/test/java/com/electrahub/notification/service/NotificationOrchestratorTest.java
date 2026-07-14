@@ -128,9 +128,10 @@ class NotificationOrchestratorTest {
         when(pushDeviceRepository.save(any(PushDeviceRegistration.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        var response = orchestrator.registerPushDevice(new NotificationDtos.PushDeviceRegistrationRequest(
+        var response = orchestrator.registerPushDevice(
                 "tenant-1",
                 "user-1",
+                new NotificationDtos.PushDeviceRegistrationRequest(
                 "device-1",
                 "iOS",
                 "very-long-firebase-token-value",

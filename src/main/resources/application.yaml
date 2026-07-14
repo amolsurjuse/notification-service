@@ -55,6 +55,13 @@ notification:
     exchange: ${NOTIFICATION_BROKER_EXCHANGE:notifications.events}
     dispatch-queue: ${NOTIFICATION_BROKER_DISPATCH_QUEUE:notifications.dispatch}
     dispatch-routing-key: ${NOTIFICATION_BROKER_DISPATCH_ROUTING_KEY:notifications.dispatch}
+    dispatch-dead-letter-exchange: ${NOTIFICATION_BROKER_DISPATCH_DLQ_EXCHANGE:notifications.dead-letter}
+    dispatch-dead-letter-queue: ${NOTIFICATION_BROKER_DISPATCH_DLQ:notifications.dispatch.dlq}
+    dispatch-dead-letter-routing-key: ${NOTIFICATION_BROKER_DISPATCH_DLQ_ROUTING_KEY:notifications.dispatch.dead-letter}
+    dispatch-retry-max-attempts: ${NOTIFICATION_BROKER_DISPATCH_RETRY_MAX_ATTEMPTS:4}
+    dispatch-retry-initial-interval-ms: ${NOTIFICATION_BROKER_DISPATCH_RETRY_INITIAL_INTERVAL_MS:1000}
+    dispatch-retry-multiplier: ${NOTIFICATION_BROKER_DISPATCH_RETRY_MULTIPLIER:2.0}
+    dispatch-retry-max-interval-ms: ${NOTIFICATION_BROKER_DISPATCH_RETRY_MAX_INTERVAL_MS:10000}
     domain-event-queue: ${NOTIFICATION_BROKER_DOMAIN_EVENT_QUEUE:notifications.domain-events}
     domain-event-routing-key: ${NOTIFICATION_BROKER_DOMAIN_EVENT_ROUTING_KEY:notifications.domain}
   contact:

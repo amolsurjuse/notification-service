@@ -72,7 +72,7 @@ public class DomainNotificationEventListener {
             case "USER_ACCOUNT_CREATED", "USER_PASSWORD_CHANGED" -> List.of(Channel.EMAIL, Channel.PUSH);
             case "USER_PASSWORD_RESET_REQUESTED", "USER_EMAIL_VERIFICATION_REQUESTED" -> List.of(Channel.EMAIL);
             case "CHARGING_SESSION_STARTED", "CHARGING_SESSION_STOPPED", "CHARGING_SESSION_START_TIMEOUT", "CHARGING_BATTERY_FULL",
-                 "CHARGING_IDLE_WARNING", "CHARGING_IDLE_STARTED" -> List.of(Channel.PUSH);
+                 "CHARGING_IDLE_WARNING", "CHARGING_IDLE_STARTED", "CHARGING_LOW_BALANCE_STOP" -> List.of(Channel.PUSH);
             case "PAYMENT_RECEIPT_READY", "CHARGING_RECEIPT_READY" -> List.of(Channel.EMAIL);
             case "SUPPORT_CONTACT_CREATED", "SUPPORT_ESCALATION_CREATED" -> List.of(Channel.EMAIL);
             default -> List.of();
@@ -95,6 +95,7 @@ public class DomainNotificationEventListener {
             case "CHARGING_BATTERY_FULL" -> "Battery full";
             case "CHARGING_IDLE_WARNING" -> "Idle fees may start soon";
             case "CHARGING_IDLE_STARTED" -> "Idle period started";
+            case "CHARGING_LOW_BALANCE_STOP" -> "Charging stopped due to low balance";
             case "PAYMENT_RECEIPT_READY", "CHARGING_RECEIPT_READY" -> "Your ElectraHub receipt";
             case "SUPPORT_CONTACT_CREATED", "SUPPORT_ESCALATION_CREATED" -> "ElectraHub support request";
             default -> "ElectraHub notification";
@@ -112,6 +113,7 @@ public class DomainNotificationEventListener {
             case "CHARGING_BATTERY_FULL" -> "Your vehicle battery is full.";
             case "CHARGING_IDLE_WARNING" -> "Please move your vehicle soon to avoid idle fees.";
             case "CHARGING_IDLE_STARTED" -> "Your idle period has started.";
+            case "CHARGING_LOW_BALANCE_STOP" -> "Your charging session was stopped because the available balance reached the configured minimum. Add funds before starting another session.";
             case "PAYMENT_RECEIPT_READY", "CHARGING_RECEIPT_READY" -> "Your receipt is ready.";
             default -> String.valueOf(payload.getOrDefault("message", subjectFor(eventType, payload)));
         };

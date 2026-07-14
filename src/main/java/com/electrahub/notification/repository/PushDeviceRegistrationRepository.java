@@ -23,6 +23,20 @@ public interface PushDeviceRegistrationRepository extends JpaRepository<PushDevi
             ContactStatus status
     );
 
+    Optional<PushDeviceRegistration> findFirstByTenantIdAndProviderAndDeviceIdAndStatusOrderByLastSeenAtDesc(
+            String tenantId,
+            String provider,
+            String deviceId,
+            ContactStatus status
+    );
+
+    List<PushDeviceRegistration> findAllByTenantIdAndProviderAndDeviceIdAndStatus(
+            String tenantId,
+            String provider,
+            String deviceId,
+            ContactStatus status
+    );
+
     List<PushDeviceRegistration> findByTenantIdAndUserIdAndProviderAndStatus(
             String tenantId,
             String userId,

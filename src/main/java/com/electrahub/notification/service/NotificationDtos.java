@@ -3,6 +3,7 @@ package com.electrahub.notification.service;
 import com.electrahub.notification.domain.Channel;
 import com.electrahub.notification.domain.ContactType;
 import com.electrahub.notification.domain.DeliveryStatus;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -70,9 +71,8 @@ public final class NotificationDtos {
     ) {
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record PushDeviceRegistrationRequest(
-            @NotBlank String tenantId,
-            @NotBlank String userId,
             @NotBlank @Size(max = 160) String deviceId,
             @NotBlank @Size(max = 32) String platform,
             @NotBlank @Size(max = 512) String fcmToken,

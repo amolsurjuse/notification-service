@@ -124,14 +124,30 @@ public class NotificationOrchestrator {
     }
 
     @Transactional
-    public NotificationDtos.PushDeviceResponse registerPushDevice(NotificationDtos.PushDeviceRegistrationRequest request) {
-        String tenantId = requiredTrim(request.tenantId(), "tenantId");
-        String userId = requiredTrim(request.userId(), "userId");
+    public NotificationDtos.PushDeviceResponse registerPushDevice(
+            String authenticatedTenantId,
+            String authenticatedUserId,
+            NotificationDtos.PushDeviceRegistrationRequest request
+    ) {
+        String tenantId = requiredTrim(authenticatedTenantId, "authenticatedTenantId");
+        String userId = requiredTrim(authenticatedUserId, "authenticatedUserId");
         String provider = defaultProvider(request.provider());
         String deviceId = requiredTrim(request.deviceId(), "deviceId");
         String platform = requiredTrim(request.platform(), "platform").toLowerCase(Locale.ROOT);
         String token = requiredTrim(request.fcmToken(), "fcmToken");
         String tokenHash = privacyHashService.sha256(token);
+
+        pushDeviceRepository.findAllByTenantIdAndProviderAndDeviceIdAndStatus(
+                        tenantId,
+                        provider,
+                        deviceId,
+                        ContactStatus.ACTIVE
+                ).stream()
+                .filter(existing -> !existing.getUserId().equals(userId))
+                .forEach(existing -> {
+                    existing.deactivate();
+                    pushDeviceRepository.save(existing);
+                });
 
         PushDeviceRegistration device = pushDeviceRepository
                 .findByTenantIdAndUserIdAndProviderAndDeviceId(tenantId, userId, provider, deviceId)

@@ -63,6 +63,21 @@ class DomainNotificationEventListenerTest {
                 .isEqualTo("event-1:USER_PASSWORD_CHANGED");
     }
 
+    @Test
+    void lowBalanceStopCreatesPushNotification() {
+        DomainNotificationEventListener listener = listener();
+        when(orchestrator.submit(any())).thenReturn(List.of());
+
+        listener.onDomainEvent(event("event-low-balance", "CHARGING_LOW_BALANCE_STOP", "session-1"));
+
+        ArgumentCaptor<NotificationDtos.SubmitNotificationRequest> request =
+                ArgumentCaptor.forClass(NotificationDtos.SubmitNotificationRequest.class);
+        verify(orchestrator).submit(request.capture());
+        assertThat(request.getValue().channels()).containsExactly(com.electrahub.notification.domain.Channel.PUSH);
+        assertThat(request.getValue().templateId()).isEqualTo("charging-low-balance-stop");
+        assertThat(request.getValue().subject()).containsIgnoringCase("low balance");
+    }
+
     private DomainNotificationEventListener listener() {
         return new DomainNotificationEventListener(orchestrator, "https://driver.electrahub.net/reset-password");
     }

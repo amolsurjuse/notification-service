@@ -21,15 +21,24 @@ public class NotificationDispatchListener {
     private static final Logger log = LoggerFactory.getLogger(NotificationDispatchListener.class);
 
     private final NotificationMessageRepository notificationRepository;
+    private final NotificationDispatchStateService dispatchStateService;
     private final Map<Channel, ChannelAdapter> adapters;
 
-    public NotificationDispatchListener(NotificationMessageRepository notificationRepository, List<ChannelAdapter> adapters) {
+    public NotificationDispatchListener(
+            NotificationMessageRepository notificationRepository,
+            NotificationDispatchStateService dispatchStateService,
+            List<ChannelAdapter> adapters
+    ) {
         this.notificationRepository = notificationRepository;
+        this.dispatchStateService = dispatchStateService;
         this.adapters = new EnumMap<>(Channel.class);
         adapters.forEach(adapter -> this.adapters.put(adapter.channel(), adapter));
     }
 
-    @RabbitListener(queues = "${notification.broker.dispatch-queue}")
+    @RabbitListener(
+            queues = "${notification.broker.dispatch-queue}",
+            containerFactory = "notificationDispatchRabbitListenerContainerFactory"
+    )
     @Transactional
     public void dispatch(DispatchCommand command) {
         withDispatchTrace(command.notificationId(), () -> {
@@ -46,7 +55,7 @@ public class NotificationDispatchListener {
             try {
                 result = adapter.dispatch(message);
             } catch (RuntimeException ex) {
-                result = DispatchResult.failure("notification-service", "dispatch ignored after adapter exception: " + ex.getMessage());
+                result = DispatchResult.retryableFailure("notification-service", "adapter exception: " + ex.getMessage());
             }
             if (result.success()) {
                 message.markDispatched(result.provider(), result.providerMessageId());
@@ -54,9 +63,12 @@ public class NotificationDispatchListener {
             } else if (result.skipped()) {
                 message.markSkipped(result.error());
                 log.info("Notification {} skipped on channel {}: {}", message.getId(), message.getChannel(), result.error());
+            } else if (result.retryable()) {
+                dispatchStateService.recordRetryableFailure(message.getId(), result.error());
+                throw new RetryableNotificationDispatchException(message.getId(), result.error());
             } else {
                 message.markFailed(result.error());
-                log.warn("Notification {} failed on channel {} and will not be retried: {}", message.getId(), message.getChannel(), result.error());
+                log.warn("Notification {} permanently failed on channel {}: {}", message.getId(), message.getChannel(), result.error());
             }
             notificationRepository.save(message);
         });

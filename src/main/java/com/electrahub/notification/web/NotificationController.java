@@ -23,6 +23,9 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1")
 public class NotificationController {
+    static final String AUTHENTICATED_USER_HEADER = "X-ElectraHub-User-Id";
+    static final String AUTHENTICATED_TENANT_HEADER = "X-ElectraHub-Tenant-Id";
+
     private final NotificationOrchestrator orchestrator;
 
     public NotificationController(NotificationOrchestrator orchestrator) {
@@ -50,15 +53,19 @@ public class NotificationController {
     }
 
     @PostMapping("/push/devices")
-    public ResponseEntity<NotificationDtos.PushDeviceResponse> registerPushDevice(@Valid @RequestBody NotificationDtos.PushDeviceRegistrationRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(orchestrator.registerPushDevice(request));
+    public ResponseEntity<NotificationDtos.PushDeviceResponse> registerPushDevice(
+            @RequestHeader(AUTHENTICATED_TENANT_HEADER) String tenantId,
+            @RequestHeader(AUTHENTICATED_USER_HEADER) String userId,
+            @Valid @RequestBody NotificationDtos.PushDeviceRegistrationRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(orchestrator.registerPushDevice(tenantId, userId, request));
     }
 
     @DeleteMapping("/push/devices/{deviceId}")
     public ResponseEntity<Void> unregisterPushDevice(
             @PathVariable String deviceId,
-            @RequestParam String tenantId,
-            @RequestParam String userId,
+            @RequestHeader(AUTHENTICATED_TENANT_HEADER) String tenantId,
+            @RequestHeader(AUTHENTICATED_USER_HEADER) String userId,
             @RequestParam(defaultValue = "firebase") String provider
     ) {
         orchestrator.unregisterPushDevice(tenantId, userId, provider, deviceId);

@@ -8,6 +8,8 @@ import com.electrahub.notification.repository.PushDeviceRegistrationRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.firebase.messaging.Message;
+import com.google.firebase.messaging.FirebaseMessagingException;
+import com.google.firebase.messaging.MessagingErrorCode;
 import com.google.firebase.messaging.Notification;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +20,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 public class FirebasePushAdapter implements ChannelAdapter {
     private static final Logger log = LoggerFactory.getLogger(FirebasePushAdapter.class);
@@ -66,7 +69,7 @@ public class FirebasePushAdapter implements ChannelAdapter {
             return DispatchResult.failure("firebase-fcm", "PUSH_DISABLED");
         }
         if (!sender.configured()) {
-            return DispatchResult.failure("firebase-fcm", "FIREBASE_NOT_CONFIGURED");
+            return DispatchResult.retryableFailure("firebase-fcm", "FIREBASE_NOT_CONFIGURED");
         }
 
         OffsetDateTime since = OffsetDateTime.now(clock).minus(QUOTA_WINDOW);
@@ -76,12 +79,17 @@ public class FirebasePushAdapter implements ChannelAdapter {
         }
 
         Map<String, Object> payload = parsePayload(message.getPayloadJson());
+        Optional<com.electrahub.notification.domain.PushDeviceRegistration> registeredDevice = Optional.empty();
         String token = firstText(payload, "fcmToken", "deviceToken", "pushToken", "registrationToken");
         if (token == null) {
-            token = pushDeviceRepository
-                    .findByTenantIdAndProviderAndDeviceIdAndStatus(message.getTenantId(), "firebase", message.getRecipientRef(), ContactStatus.ACTIVE)
-                    .map(device -> safeTrim(device.getFcmToken()))
-                    .orElse(null);
+            registeredDevice = pushDeviceRepository
+                    .findFirstByTenantIdAndProviderAndDeviceIdAndStatusOrderByLastSeenAtDesc(
+                            message.getTenantId(),
+                            "firebase",
+                            message.getRecipientRef(),
+                            ContactStatus.ACTIVE
+                    );
+            token = registeredDevice.map(device -> safeTrim(device.getFcmToken())).orElse(null);
         }
         if (token == null && looksLikeLegacyToken(message.getRecipientRef())) {
             token = safeTrim(message.getRecipientRef());
@@ -94,10 +102,37 @@ public class FirebasePushAdapter implements ChannelAdapter {
         try {
             String providerMessageId = sender.send(toFirebaseMessage(message, payload, token));
             return DispatchResult.success("firebase-fcm", providerMessageId);
+        } catch (FirebaseMessagingException ex) {
+            MessagingErrorCode errorCode = ex.getMessagingErrorCode();
+            String error = "FIREBASE_SEND_FAILED code=" + errorCode + " message=" + ex.getMessage();
+            if (isInvalidRegistration(errorCode)) {
+                deactivateInvalidDevice(registeredDevice);
+                log.info("Firebase token rejected for notification {} device {}; registration deactivated", message.getId(), message.getRecipientRef());
+                return DispatchResult.failure("firebase-fcm", error);
+            }
+            log.warn("Retryable Firebase provider failure for notification {}: {}", message.getId(), error);
+            return DispatchResult.retryableFailure("firebase-fcm", error);
         } catch (Exception ex) {
-            log.warn("Firebase push provider failure ignored without retry for notification {}: {}", message.getId(), ex.getMessage());
-            return DispatchResult.failure("firebase-fcm", "FIREBASE_SEND_FAILED: " + ex.getMessage());
+            log.warn("Retryable Firebase provider failure for notification {}: {}", message.getId(), ex.getMessage());
+            return DispatchResult.retryableFailure("firebase-fcm", "FIREBASE_SEND_FAILED: " + ex.getMessage());
         }
+    }
+
+    private boolean isInvalidRegistration(MessagingErrorCode errorCode) {
+        return errorCode == MessagingErrorCode.INVALID_ARGUMENT
+                || errorCode == MessagingErrorCode.SENDER_ID_MISMATCH
+                || errorCode == MessagingErrorCode.UNREGISTERED;
+    }
+
+    private void deactivateInvalidDevice(
+            Optional<com.electrahub.notification.domain.PushDeviceRegistration> registeredDevice
+    ) {
+        if (registeredDevice.isEmpty()) {
+            return;
+        }
+        com.electrahub.notification.domain.PushDeviceRegistration device = registeredDevice.get();
+        device.deactivate();
+        pushDeviceRepository.save(device);
     }
 
     private Message toFirebaseMessage(NotificationMessage message, Map<String, Object> payload, String token) {
