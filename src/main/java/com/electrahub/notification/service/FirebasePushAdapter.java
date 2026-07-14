@@ -2,6 +2,7 @@ package com.electrahub.notification.service;
 
 import com.electrahub.notification.domain.Channel;
 import com.electrahub.notification.domain.ContactStatus;
+import com.electrahub.notification.domain.DeliveryStatus;
 import com.electrahub.notification.domain.NotificationMessage;
 import com.electrahub.notification.repository.NotificationMessageRepository;
 import com.electrahub.notification.repository.PushDeviceRegistrationRepository;
@@ -73,8 +74,12 @@ public class FirebasePushAdapter implements ChannelAdapter {
         }
 
         OffsetDateTime since = OffsetDateTime.now(clock).minus(QUOTA_WINDOW);
-        long attemptsInWindow = notificationRepository.countAttemptedSince(Channel.PUSH, since);
-        if (attemptsInWindow >= dailyLimit) {
+        long dispatchedInWindow = notificationRepository.countDispatchedSince(
+                Channel.PUSH,
+                DeliveryStatus.DISPATCHED,
+                since
+        );
+        if (dispatchedInWindow >= dailyLimit) {
             return DispatchResult.failure("firebase-fcm", "PUSH_DAILY_QUOTA_EXCEEDED rollingWindowHours=24 limit=" + dailyLimit);
         }
 

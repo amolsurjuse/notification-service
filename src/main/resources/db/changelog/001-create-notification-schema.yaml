@@ -137,3 +137,16 @@ databaseChangeLog:
               - column: { name: provider }
               - column: { name: device_id }
               - column: { name: status }
+
+  - changeSet:
+      id: 006-index-successful-notification-dispatches
+      author: notification-service
+      changes:
+        - createIndex:
+            schemaName: notification
+            tableName: notifications
+            indexName: idx_notifications_channel_status_dispatched
+            columns:
+              - column: { name: channel }
+              - column: { name: status }
+              - column: { name: dispatched_at }
