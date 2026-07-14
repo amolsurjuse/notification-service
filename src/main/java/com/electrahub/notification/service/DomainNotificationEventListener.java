@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -54,7 +55,7 @@ public class DomainNotificationEventListener {
             NotificationDtos.SubmitNotificationRequest request = new NotificationDtos.SubmitNotificationRequest(
                     event.tenantId(),
                     event.eventId(),
-                    event.eventId() + ":" + event.eventType(),
+                    idempotencyKeyFor(event, payload),
                     event.recipientRef(),
                     channels,
                     templateFor(event.eventType()),
@@ -114,6 +115,29 @@ public class DomainNotificationEventListener {
             case "PAYMENT_RECEIPT_READY", "CHARGING_RECEIPT_READY" -> "Your receipt is ready.";
             default -> String.valueOf(payload.getOrDefault("message", subjectFor(eventType, payload)));
         };
+    }
+
+    static String idempotencyKeyFor(NotificationDtos.DomainNotificationEvent event, Map<String, Object> payload) {
+        String eventType = event.eventType() == null ? "" : event.eventType().trim().toUpperCase(Locale.ROOT);
+        String sessionId = text(payload == null ? null : payload.get("sessionId"));
+        if (eventType.startsWith("CHARGING_") && sessionId != null) {
+            String seed = String.join(":", textOrEmpty(event.tenantId()), eventType, sessionId);
+            return "charging:" + UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8));
+        }
+        return event.eventId() + ":" + event.eventType();
+    }
+
+    private static String text(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String result = String.valueOf(value).trim();
+        return result.isEmpty() ? null : result;
+    }
+
+    private static String textOrEmpty(Object value) {
+        String result = text(value);
+        return result == null ? "" : result;
     }
 
     private void withEventTrace(String eventId, Runnable action) {
