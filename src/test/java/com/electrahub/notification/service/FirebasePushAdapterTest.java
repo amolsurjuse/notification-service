@@ -9,6 +9,8 @@ import com.electrahub.notification.repository.NotificationMessageRepository;
 import com.electrahub.notification.repository.PushDeviceRegistrationRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.firebase.messaging.Message;
+import com.google.firebase.messaging.FirebaseMessagingException;
+import com.google.firebase.messaging.MessagingErrorCode;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -139,6 +141,25 @@ class FirebasePushAdapterTest {
         assertThat(result.success()).isFalse();
         assertThat(result.retryable()).isTrue();
         assertThat(result.error()).contains("temporary outage");
+    }
+
+    @Test
+    void missingApnsCredentialsFailWithoutRetrying() throws Exception {
+        NotificationMessageRepository repository = mock(NotificationMessageRepository.class);
+        PushDeviceRegistrationRepository pushDeviceRepository = mock(PushDeviceRegistrationRepository.class);
+        FirebasePushSender sender = configuredSender();
+        FirebaseMessagingException exception = mock(FirebaseMessagingException.class);
+        when(exception.getMessagingErrorCode()).thenReturn(MessagingErrorCode.THIRD_PARTY_AUTH_ERROR);
+        when(exception.getMessage()).thenReturn("APNs authentication key is missing");
+        when(repository.countDispatchedSince(eq(Channel.PUSH), eq(DeliveryStatus.DISPATCHED), any())).thenReturn(0L);
+        when(sender.send(any())).thenThrow(exception);
+        FirebasePushAdapter adapter = new FirebasePushAdapter(repository, pushDeviceRepository, OBJECT_MAPPER, sender, CLOCK, true, 500, 5);
+
+        DispatchResult result = adapter.dispatch(message("{\"fcmToken\":\"token-1\"}"));
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.retryable()).isFalse();
+        assertThat(result.error()).contains("THIRD_PARTY_AUTH_ERROR");
     }
 
     private NotificationMessage message(String payloadJson) {

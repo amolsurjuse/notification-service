@@ -115,6 +115,10 @@ public class FirebasePushAdapter implements ChannelAdapter {
                 log.info("Firebase token rejected for notification {} device {}; registration deactivated", message.getId(), message.getRecipientRef());
                 return DispatchResult.failure("firebase-fcm", error);
             }
+            if (errorCode == MessagingErrorCode.THIRD_PARTY_AUTH_ERROR) {
+                log.error("Firebase APNs credentials rejected for notification {}: {}", message.getId(), error);
+                return DispatchResult.failure("firebase-fcm", error);
+            }
             log.warn("Retryable Firebase provider failure for notification {}: {}", message.getId(), error);
             return DispatchResult.retryableFailure("firebase-fcm", error);
         } catch (Exception ex) {
