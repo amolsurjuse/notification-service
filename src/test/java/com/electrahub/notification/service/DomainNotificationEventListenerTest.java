@@ -83,6 +83,51 @@ class DomainNotificationEventListenerTest {
         });
     }
 
+    @Test
+    void accountAndPaymentEventsCreateInboxNotificationsOnly() {
+        DomainNotificationEventListener listener = listener();
+        when(orchestrator.submit(any())).thenReturn(List.of());
+        List<String> eventTypes = List.of(
+                "PAYMENT_CARD_ADDED",
+                "PAYMENT_CARD_REMOVED",
+                "PAYMENT_AUTO_TOP_UP_ENABLED",
+                "PAYMENT_AUTO_TOP_UP_DISABLED",
+                "PAYMENT_AUTO_TOP_UP_UPDATED",
+                "PAYMENT_AUTO_TOP_UP_COMPLETED",
+                "PAYMENT_WALLET_TOP_UP_COMPLETED",
+                "USER_PROFILE_UPDATED"
+        );
+
+        eventTypes.forEach(eventType -> listener.onDomainEvent(new NotificationDtos.DomainNotificationEvent(
+                "event-" + eventType,
+                eventType,
+                "electrahub",
+                "user-1",
+                "user-1",
+                "2026-07-15T12:00:00Z",
+                Map.of(
+                        "brand", "Visa",
+                        "last4", "1111",
+                        "cardBrand", "Visa",
+                        "cardLast4", "1111",
+                        "amount", "20.00",
+                        "threshold", "30.00",
+                        "newBalance", "42.00",
+                        "currency", "USD"
+                )
+        )));
+
+        ArgumentCaptor<NotificationDtos.SubmitNotificationRequest> requests =
+                ArgumentCaptor.forClass(NotificationDtos.SubmitNotificationRequest.class);
+        verify(orchestrator, times(eventTypes.size())).submit(requests.capture());
+        assertThat(requests.getAllValues()).allSatisfy(request -> {
+            assertThat(request.channels()).containsExactly(com.electrahub.notification.domain.Channel.IN_APP);
+            assertThat(request.recipientRef()).isEqualTo("user-1");
+            assertThat(request.subject()).isNotEqualTo("ElectraHub notification");
+            assertThat(request.body()).isNotBlank();
+        });
+    }
+
     private DomainNotificationEventListener listener() {
         return new DomainNotificationEventListener(orchestrator, "https://driver.electrahub.net/reset-password");
     }

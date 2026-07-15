@@ -80,6 +80,9 @@ public class DomainNotificationEventListener {
             case "CHARGING_SESSION_STARTED", "CHARGING_SESSION_STOPPED", "CHARGING_SESSION_START_TIMEOUT", "CHARGING_BATTERY_FULL",
                  "CHARGING_IDLE_WARNING", "CHARGING_IDLE_STARTED", "CHARGING_LOW_BALANCE_STOP" -> List.of(Channel.PUSH, Channel.IN_APP);
             case "PAYMENT_RECEIPT_READY", "CHARGING_RECEIPT_READY" -> List.of(Channel.EMAIL, Channel.PUSH, Channel.IN_APP);
+            case "PAYMENT_CARD_ADDED", "PAYMENT_CARD_REMOVED",
+                 "PAYMENT_AUTO_TOP_UP_ENABLED", "PAYMENT_AUTO_TOP_UP_DISABLED", "PAYMENT_AUTO_TOP_UP_UPDATED",
+                 "PAYMENT_AUTO_TOP_UP_COMPLETED", "PAYMENT_WALLET_TOP_UP_COMPLETED", "USER_PROFILE_UPDATED" -> List.of(Channel.IN_APP);
             case "SUPPORT_CONTACT_CREATED", "SUPPORT_ESCALATION_CREATED" -> List.of(Channel.EMAIL);
             default -> List.of();
         };
@@ -113,6 +116,14 @@ public class DomainNotificationEventListener {
             case "CHARGING_IDLE_STARTED" -> "Idle period started";
             case "CHARGING_LOW_BALANCE_STOP" -> "Charging stopped due to low balance";
             case "PAYMENT_RECEIPT_READY", "CHARGING_RECEIPT_READY" -> "Your ElectraHub receipt";
+            case "PAYMENT_CARD_ADDED" -> "Credit card added";
+            case "PAYMENT_CARD_REMOVED" -> "Credit card removed";
+            case "PAYMENT_AUTO_TOP_UP_ENABLED" -> "Auto top-up enabled";
+            case "PAYMENT_AUTO_TOP_UP_DISABLED" -> "Auto top-up disabled";
+            case "PAYMENT_AUTO_TOP_UP_UPDATED" -> "Auto top-up updated";
+            case "PAYMENT_AUTO_TOP_UP_COMPLETED" -> "Wallet topped up automatically";
+            case "PAYMENT_WALLET_TOP_UP_COMPLETED" -> "Wallet top-up complete";
+            case "USER_PROFILE_UPDATED" -> "Profile updated";
             case "SUPPORT_CONTACT_CREATED", "SUPPORT_ESCALATION_CREATED" -> "ElectraHub support request";
             default -> "ElectraHub notification";
         };
@@ -131,8 +142,37 @@ public class DomainNotificationEventListener {
             case "CHARGING_IDLE_STARTED" -> "Your idle period has started.";
             case "CHARGING_LOW_BALANCE_STOP" -> "Your charging session was stopped because the available balance reached the configured minimum. Add funds before starting another session.";
             case "PAYMENT_RECEIPT_READY", "CHARGING_RECEIPT_READY" -> "Your receipt is ready.";
+            case "PAYMENT_CARD_ADDED" -> cardDescription(payload) + " was added to your payment methods.";
+            case "PAYMENT_CARD_REMOVED" -> cardDescription(payload) + " was removed from your payment methods.";
+            case "PAYMENT_AUTO_TOP_UP_ENABLED" -> "Auto top-up is on. "
+                    + amount(payload, "amount") + " will be added when your wallet drops below "
+                    + amount(payload, "threshold") + ", using " + fundingCardDescription(payload) + ".";
+            case "PAYMENT_AUTO_TOP_UP_DISABLED" -> "Auto top-up is off. Your wallet will no longer be funded automatically.";
+            case "PAYMENT_AUTO_TOP_UP_UPDATED" -> "Auto top-up settings were updated. Amount: "
+                    + amount(payload, "amount") + "; threshold: " + amount(payload, "threshold")
+                    + "; card: " + fundingCardDescription(payload) + ".";
+            case "PAYMENT_AUTO_TOP_UP_COMPLETED" -> amount(payload, "amount")
+                    + " was added automatically. New wallet balance: " + amount(payload, "newBalance") + ".";
+            case "PAYMENT_WALLET_TOP_UP_COMPLETED" -> amount(payload, "amount")
+                    + " was added to your wallet. New balance: " + amount(payload, "newBalance") + ".";
+            case "USER_PROFILE_UPDATED" -> "Your profile details were updated.";
             default -> String.valueOf(payload.getOrDefault("message", subjectFor(eventType, payload)));
         };
+    }
+
+    private String cardDescription(Map<String, Object> payload) {
+        return String.valueOf(payload.getOrDefault("brand", "Card"))
+                + " ending in " + String.valueOf(payload.getOrDefault("last4", "****"));
+    }
+
+    private String fundingCardDescription(Map<String, Object> payload) {
+        return String.valueOf(payload.getOrDefault("cardBrand", "card"))
+                + " ending in " + String.valueOf(payload.getOrDefault("cardLast4", "****"));
+    }
+
+    private String amount(Map<String, Object> payload, String field) {
+        return String.valueOf(payload.getOrDefault(field, "0.00")) + " "
+                + String.valueOf(payload.getOrDefault("currency", "USD"));
     }
 
     static String idempotencyKeyFor(NotificationDtos.DomainNotificationEvent event, Map<String, Object> payload) {
