@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -50,6 +52,7 @@ public class DomainNotificationEventListener {
                 String token = String.valueOf(payload.getOrDefault("resetToken", ""));
                 payload.put("resetUrl", driverResetPasswordUrl + "?token=" + token);
             }
+            OffsetDateTime occurredAt = parseOccurredAt(event.occurredAt());
 
             for (Channel channel : channels) {
                 String recipientRef = recipientFor(event, channel);
@@ -66,7 +69,8 @@ public class DomainNotificationEventListener {
                         templateFor(event.eventType()),
                         subjectFor(event.eventType(), payload),
                         bodyFor(event.eventType(), payload),
-                        payload
+                        payload,
+                        occurredAt
                 );
                 orchestrator.submit(request);
             }
@@ -78,7 +82,7 @@ public class DomainNotificationEventListener {
             case "USER_ACCOUNT_CREATED", "USER_PASSWORD_CHANGED" -> List.of(Channel.EMAIL, Channel.PUSH, Channel.IN_APP);
             case "USER_PASSWORD_RESET_REQUESTED", "USER_EMAIL_VERIFICATION_REQUESTED" -> List.of(Channel.EMAIL);
             case "CHARGING_SESSION_STARTED", "CHARGING_SESSION_STOPPED", "CHARGING_SESSION_START_TIMEOUT", "CHARGING_BATTERY_FULL",
-                 "CHARGING_IDLE_WARNING", "CHARGING_IDLE_STARTED", "CHARGING_LOW_BALANCE_STOP" -> List.of(Channel.PUSH, Channel.IN_APP);
+                 "CHARGING_IDLE_WARNING", "CHARGING_IDLE_STARTED", "CHARGING_IDLE_FEE_STARTED", "CHARGING_LOW_BALANCE_STOP" -> List.of(Channel.PUSH, Channel.IN_APP);
             case "PAYMENT_RECEIPT_READY", "CHARGING_RECEIPT_READY" -> List.of(Channel.EMAIL, Channel.PUSH, Channel.IN_APP);
             case "PAYMENT_CARD_ADDED", "PAYMENT_CARD_REMOVED",
                  "PAYMENT_AUTO_TOP_UP_ENABLED", "PAYMENT_AUTO_TOP_UP_DISABLED", "PAYMENT_AUTO_TOP_UP_UPDATED",
@@ -114,6 +118,7 @@ public class DomainNotificationEventListener {
             case "CHARGING_BATTERY_FULL" -> "Battery full";
             case "CHARGING_IDLE_WARNING" -> "Idle fees may start soon";
             case "CHARGING_IDLE_STARTED" -> "Idle period started";
+            case "CHARGING_IDLE_FEE_STARTED" -> "Idle fees have started";
             case "CHARGING_LOW_BALANCE_STOP" -> "Charging stopped due to low balance";
             case "PAYMENT_RECEIPT_READY", "CHARGING_RECEIPT_READY" -> "Your ElectraHub receipt";
             case "PAYMENT_CARD_ADDED" -> "Credit card added";
@@ -139,7 +144,8 @@ public class DomainNotificationEventListener {
             case "CHARGING_SESSION_START_TIMEOUT" -> "The charger did not start in time. Please try another connector or contact support.";
             case "CHARGING_BATTERY_FULL" -> "Your vehicle battery is full.";
             case "CHARGING_IDLE_WARNING" -> "Please move your vehicle soon to avoid idle fees.";
-            case "CHARGING_IDLE_STARTED" -> "Your idle period has started.";
+            case "CHARGING_IDLE_STARTED" -> "Charging has paused. Unplug your vehicle to stop idle fees.";
+            case "CHARGING_IDLE_FEE_STARTED" -> "Idle fees are now being charged. Unplug your vehicle to stop further fees.";
             case "CHARGING_LOW_BALANCE_STOP" -> "Your charging session was stopped because the available balance reached the configured minimum. Add funds before starting another session.";
             case "PAYMENT_RECEIPT_READY", "CHARGING_RECEIPT_READY" -> "Your receipt is ready.";
             case "PAYMENT_CARD_ADDED" -> cardDescription(payload) + " was added to your payment methods.";
@@ -183,6 +189,19 @@ public class DomainNotificationEventListener {
             return "charging:" + UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8));
         }
         return event.eventId() + ":" + event.eventType();
+    }
+
+    static OffsetDateTime parseOccurredAt(String value) {
+        String normalized = text(value);
+        if (normalized == null) {
+            return null;
+        }
+        try {
+            return OffsetDateTime.parse(normalized);
+        } catch (DateTimeParseException ex) {
+            log.warn("Ignoring invalid notification event timestamp {}", normalized);
+            return null;
+        }
     }
 
     private static String text(Object value) {

@@ -3,6 +3,7 @@ package com.electrahub.notification.service;
 import com.electrahub.notification.domain.Channel;
 import com.electrahub.notification.domain.ContactType;
 import com.electrahub.notification.domain.DeliveryStatus;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -28,8 +29,22 @@ public final class NotificationDtos {
             @NotBlank String templateId,
             @Size(max = 240) String subject,
             @Size(max = 2000) String body,
-            Map<String, Object> payload
+            Map<String, Object> payload,
+            @JsonIgnore OffsetDateTime occurredAt
     ) {
+        public SubmitNotificationRequest(
+                String tenantId,
+                String eventId,
+                String idempotencyKey,
+                String recipientRef,
+                List<Channel> channels,
+                String templateId,
+                String subject,
+                String body,
+                Map<String, Object> payload
+        ) {
+            this(tenantId, eventId, idempotencyKey, recipientRef, channels, templateId, subject, body, payload, null);
+        }
     }
 
     public record NotificationResponse(

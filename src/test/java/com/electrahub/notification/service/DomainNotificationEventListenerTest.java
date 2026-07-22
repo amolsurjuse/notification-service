@@ -6,6 +6,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -80,6 +81,32 @@ class DomainNotificationEventListenerTest {
             assertThat(value.recipientRef()).isEqualTo("user-1");
             assertThat(value.templateId()).isEqualTo("charging-low-balance-stop");
             assertThat(value.subject()).containsIgnoringCase("low balance");
+        });
+    }
+
+    @Test
+    void preservesTheDomainEventTimeForAsynchronouslyDeliveredNotifications() {
+        DomainNotificationEventListener listener = listener();
+        when(orchestrator.submit(any())).thenReturn(List.of());
+        OffsetDateTime occurredAt = OffsetDateTime.parse("2026-07-22T12:34:56Z");
+
+        listener.onDomainEvent(new NotificationDtos.DomainNotificationEvent(
+                "event-idle-fee-started",
+                "CHARGING_IDLE_FEE_STARTED",
+                "electrahub",
+                "user-1",
+                "user-1",
+                occurredAt.toString(),
+                Map.of("sessionId", "session-1")
+        ));
+
+        ArgumentCaptor<NotificationDtos.SubmitNotificationRequest> request =
+                ArgumentCaptor.forClass(NotificationDtos.SubmitNotificationRequest.class);
+        verify(orchestrator, times(2)).submit(request.capture());
+        assertThat(request.getAllValues()).allSatisfy(value -> {
+            assertThat(value.templateId()).isEqualTo("charging-idle-fee-started");
+            assertThat(value.occurredAt()).isEqualTo(occurredAt);
+            assertThat(value.subject()).isEqualTo("Idle fees have started");
         });
     }
 

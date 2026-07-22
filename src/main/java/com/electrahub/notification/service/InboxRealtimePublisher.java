@@ -32,7 +32,7 @@ public class InboxRealtimePublisher {
                 message.getTenantId(),
                 message.getRecipientRef(),
                 message.getId(),
-                OffsetDateTime.now()
+                message.getCreatedAt() == null ? OffsetDateTime.now() : message.getCreatedAt()
         ));
     }
 

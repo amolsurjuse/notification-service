@@ -18,6 +18,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -116,6 +117,33 @@ class NotificationOrchestratorTest {
         assertThat(responses).hasSize(1);
         verify(notificationRepository, never()).save(any());
         verify(rabbitTemplate, never()).convertAndSend(any(String.class), any(String.class), any(Object.class));
+    }
+
+    @Test
+    void submitUsesTheOriginalDomainTimeForInboxOrdering() {
+        NotificationOrchestrator orchestrator = orchestrator();
+        OffsetDateTime occurredAt = OffsetDateTime.parse("2026-07-22T12:34:56Z");
+        when(notificationRepository.findByIdempotencyKeyAndChannelAndRecipientRef(any(), any(), any()))
+                .thenReturn(Optional.empty());
+        when(notificationRepository.save(any(NotificationMessage.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        orchestrator.submit(new NotificationDtos.SubmitNotificationRequest(
+                "tenant-1",
+                "event-1",
+                "key-1",
+                "user-1",
+                List.of(Channel.IN_APP),
+                "charging-idle-fee-started",
+                "Idle fees have started",
+                "Idle fees are now being charged.",
+                Map.of("sessionId", "session-1"),
+                occurredAt
+        ));
+
+        ArgumentCaptor<NotificationMessage> notification = ArgumentCaptor.forClass(NotificationMessage.class);
+        verify(notificationRepository).save(notification.capture());
+        assertThat(notification.getValue().getCreatedAt()).isEqualTo(occurredAt);
     }
 
     @Test

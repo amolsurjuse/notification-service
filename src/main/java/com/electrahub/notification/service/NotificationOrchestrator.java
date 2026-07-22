@@ -390,6 +390,7 @@ public class NotificationOrchestrator {
         message.setSubject(trimToNull(request.subject()));
         message.setBody(trimToNull(request.body()));
         message.setPayloadJson(toJson(request.payload()));
+        message.setCreatedAt(request.occurredAt());
         NotificationMessage saved = notificationRepository.save(message);
         if (channel == Channel.IN_APP) {
             inboxRealtimePublisher.created(saved);
@@ -416,6 +417,7 @@ public class NotificationOrchestrator {
         message.setSubject(trimToNull(request.subject()));
         message.setBody(trimToNull(request.body()));
         message.setPayloadJson(toJson(request.payload()));
+        message.setCreatedAt(request.occurredAt());
         message.markSkipped(reason);
         return notificationRepository.save(message);
     }

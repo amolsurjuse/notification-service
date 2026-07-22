@@ -125,6 +125,7 @@ public class NotificationMessage {
     public void setSubject(String subject) { this.subject = subject; }
     public void setBody(String body) { this.body = body; }
     public void setPayloadJson(String payloadJson) { this.payloadJson = payloadJson; }
+    public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
 
     public void markDispatched(String provider, String providerMessageId) {
         this.status = channel == Channel.IN_APP ? DeliveryStatus.DELIVERED : DeliveryStatus.DISPATCHED;
