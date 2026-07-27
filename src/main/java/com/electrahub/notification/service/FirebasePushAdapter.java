@@ -8,6 +8,10 @@ import com.electrahub.notification.repository.NotificationMessageRepository;
 import com.electrahub.notification.repository.PushDeviceRegistrationRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.firebase.messaging.AndroidConfig;
+import com.google.firebase.messaging.AndroidNotification;
+import com.google.firebase.messaging.ApnsConfig;
+import com.google.firebase.messaging.Aps;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.MessagingErrorCode;
@@ -147,6 +151,18 @@ public class FirebasePushAdapter implements ChannelAdapter {
     private Message toFirebaseMessage(NotificationMessage message, Map<String, Object> payload, String token) {
         Message.Builder builder = Message.builder()
                 .setToken(token)
+                .setAndroidConfig(AndroidConfig.builder()
+                        .setPriority(AndroidConfig.Priority.HIGH)
+                        .setNotification(AndroidNotification.builder()
+                                .setChannelId("charging-updates")
+                                .setSound("default")
+                                .build())
+                        .build())
+                .setApnsConfig(ApnsConfig.builder()
+                        .setAps(Aps.builder()
+                                .setSound("default")
+                                .build())
+                        .build())
                 .putAllData(dataPayload(message, payload));
 
         String title = firstText(payload, "title");
