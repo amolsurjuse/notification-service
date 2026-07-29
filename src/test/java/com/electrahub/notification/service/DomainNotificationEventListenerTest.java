@@ -9,6 +9,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -194,7 +195,8 @@ class DomainNotificationEventListenerTest {
     void disabledReceiptEmailStillCreatesPushAndInbox() {
         DomainNotificationEventListener listener = listener();
         when(orchestrator.submit(any())).thenReturn(List.of());
-        when(communicationPreferenceService.shouldDeliverReceiptEmail("electrahub", "user-1")).thenReturn(false);
+        when(communicationPreferenceService.resolveReceiptEmail("electrahub", "user-1"))
+                .thenReturn(Optional.empty());
         listener.onDomainEvent(event("receipt-event", "CHARGING_RECEIPT_READY", "session-1"));
         ArgumentCaptor<NotificationDtos.SubmitNotificationRequest> requests =
                 ArgumentCaptor.forClass(NotificationDtos.SubmitNotificationRequest.class);
@@ -205,6 +207,24 @@ class DomainNotificationEventListenerTest {
                         com.electrahub.notification.domain.Channel.PUSH,
                         com.electrahub.notification.domain.Channel.IN_APP
                 );
+    }
+
+    @Test
+    void receiptEmailUsesVerifiedProfileAddressInsteadOfEventRecipient() {
+        DomainNotificationEventListener listener = listener();
+        when(orchestrator.submit(any())).thenReturn(List.of());
+        when(communicationPreferenceService.resolveReceiptEmail("electrahub", "user-1"))
+                .thenReturn(Optional.of("user@example.com"));
+
+        listener.onDomainEvent(event("receipt-event", "CHARGING_RECEIPT_READY", "session-1"));
+
+        ArgumentCaptor<NotificationDtos.SubmitNotificationRequest> requests =
+                ArgumentCaptor.forClass(NotificationDtos.SubmitNotificationRequest.class);
+        verify(orchestrator, times(3)).submit(requests.capture());
+        assertThat(requests.getAllValues()).anySatisfy(request -> {
+            assertThat(request.channels()).containsExactly(com.electrahub.notification.domain.Channel.EMAIL);
+            assertThat(request.recipientRef()).isEqualTo("user@example.com");
+        });
     }
 
     private DomainNotificationEventListener listener() {

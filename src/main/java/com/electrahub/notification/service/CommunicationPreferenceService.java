@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class CommunicationPreferenceService {
@@ -70,19 +71,24 @@ public class CommunicationPreferenceService {
     }
 
     @Transactional(readOnly = true)
-    public boolean shouldDeliverReceiptEmail(String tenantId, String userId) {
+    public Optional<String> resolveReceiptEmail(String tenantId, String userId) {
         if (userId == null || userId.isBlank()) {
-            return false;
+            return Optional.empty();
         }
         try {
             UserPrincipalClient.UserPrincipal principal = userPrincipalClient.get(userId);
-            return principal != null
-                    && principal.isEmailVerified()
-                    && enabled(tenantId, userId, EMAIL, ALL)
-                    && enabled(tenantId, userId, EMAIL, RECEIPT);
+            if (principal == null
+                    || !principal.isEmailVerified()
+                    || principal.email() == null
+                    || principal.email().isBlank()
+                    || !enabled(tenantId, userId, EMAIL, ALL)
+                    || !enabled(tenantId, userId, EMAIL, RECEIPT)) {
+                return Optional.empty();
+            }
+            return Optional.of(principal.email().trim());
         } catch (RuntimeException ex) {
-            log.warn("Skipping optional receipt email because user verification could not be resolved userId={}", userId);
-            return false;
+            log.warn("Skipping optional receipt email because its verified recipient could not be resolved userId={}", userId);
+            return Optional.empty();
         }
     }
 

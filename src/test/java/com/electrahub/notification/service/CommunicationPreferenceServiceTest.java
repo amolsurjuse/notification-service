@@ -52,7 +52,21 @@ class CommunicationPreferenceServiceTest {
     }
 
     @Test
-    void disabledReceiptOverridePreventsOptionalEmail() {
+    void verifiedReceiptResolvesProfileEmail() {
+        CommunicationPreferenceRepository repository = mock(CommunicationPreferenceRepository.class);
+        UserPrincipalClient client = mock(UserPrincipalClient.class);
+        when(client.get("user-1")).thenReturn(
+                new UserPrincipalClient.UserPrincipal("user-1", " user@example.com ", true));
+        when(repository.findByTenantIdAndUserIdAndChannelAndTopic(
+                anyString(), anyString(), anyString(), anyString())).thenReturn(Optional.empty());
+        CommunicationPreferenceService service = new CommunicationPreferenceService(repository, client);
+
+        assertThat(service.resolveReceiptEmail("electrahub", "user-1"))
+                .contains("user@example.com");
+    }
+
+    @Test
+    void disabledReceiptOverrideHasNoRecipient() {
         CommunicationPreferenceRepository repository = mock(CommunicationPreferenceRepository.class);
         UserPrincipalClient client = mock(UserPrincipalClient.class);
         when(client.get("user-1")).thenReturn(
@@ -66,6 +80,6 @@ class CommunicationPreferenceServiceTest {
                         "electrahub", "user-1", "EMAIL", "RECEIPT", false)));
         CommunicationPreferenceService service = new CommunicationPreferenceService(repository, client);
 
-        assertThat(service.shouldDeliverReceiptEmail("electrahub", "user-1")).isFalse();
+        assertThat(service.resolveReceiptEmail("electrahub", "user-1")).isEmpty();
     }
 }

@@ -65,13 +65,18 @@ public class DomainNotificationEventListener {
             OffsetDateTime occurredAt = parseOccurredAt(event.occurredAt());
 
             for (Channel channel : channels) {
-                if (channel == Channel.EMAIL
-                        && isReceiptEvent(event.eventType())
-                        && !communicationPreferenceService.shouldDeliverReceiptEmail(event.tenantId(), event.userId())) {
-                    log.info("Skipping optional receipt email for event {} because it is unavailable or disabled", event.eventId());
-                    continue;
+                String recipientRef;
+                if (channel == Channel.EMAIL && isReceiptEvent(event.eventType())) {
+                    recipientRef = communicationPreferenceService
+                            .resolveReceiptEmail(event.tenantId(), event.userId())
+                            .orElse(null);
+                    if (recipientRef == null) {
+                        log.info("Skipping optional receipt email for event {} because it is unavailable or disabled", event.eventId());
+                        continue;
+                    }
+                } else {
+                    recipientRef = recipientFor(event, channel);
                 }
-                String recipientRef = recipientFor(event, channel);
                 if (recipientRef == null) {
                     log.warn("Ignoring {} channel for event {} because no recipient is available", channel, event.eventType());
                     continue;
