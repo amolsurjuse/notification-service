@@ -40,6 +40,43 @@ class NotificationTemplateCatalogTest {
                 });
     }
 
+    @Test
+    void selectsCountryTemplateBeforeGlobalAndFallsBackForUnsupportedCountries() {
+        NotificationProjectRepository projects = mock(NotificationProjectRepository.class);
+        NotificationTemplateRepository templates = mock(NotificationTemplateRepository.class);
+        NotificationTemplate global = template(1, "Global receipt");
+        NotificationTemplate india = new NotificationTemplate(
+                "electrahub",
+                "charging-receipt-ready",
+                Channel.EMAIL,
+                "en-US",
+                "IN",
+                1,
+                "India GST receipt",
+                "<p>India</p>",
+                "text/html; charset=UTF-8",
+                true
+        );
+        when(projects.findByEnabledTrue()).thenReturn(List.of(project()));
+        when(templates.findByEnabledTrue()).thenReturn(List.of(global, india));
+
+        NotificationTemplateCatalog catalog = new NotificationTemplateCatalog(projects, templates);
+        catalog.setResourceLoader(new DefaultResourceLoader());
+        catalog.reload();
+
+        assertThat(catalog.loadedTemplateCount()).isEqualTo(2);
+        assertThat(catalog.template(
+                "electrahub", "charging-receipt-ready", Channel.EMAIL, "en-IN", "IN"))
+                .get()
+                .extracting(NotificationTemplate::getSubjectTemplate)
+                .isEqualTo("India GST receipt");
+        assertThat(catalog.template(
+                "electrahub", "charging-receipt-ready", Channel.EMAIL, "en-CA", "CA"))
+                .get()
+                .extracting(NotificationTemplate::getSubjectTemplate)
+                .isEqualTo("Global receipt");
+    }
+
     private NotificationProject project() {
         return new NotificationProject(
                 "electrahub",

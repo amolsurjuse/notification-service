@@ -38,6 +38,7 @@ class NotificationTemplateMigrationTest {
                          where p.project_key = 'electrahub'
                            and t.template_key = 'charging-receipt-ready'
                            and t.channel = 'EMAIL'
+                           and t.country_code = '*'
                          """)) {
                 assertThat(result.next()).isTrue();
                 assertThat(result.getString("display_name")).isEqualTo("ElectraHub");
@@ -46,6 +47,24 @@ class NotificationTemplateMigrationTest {
                 assertThat(result.getString("body_template"))
                         .contains("cid:project-logo")
                         .contains("Total paid");
+            }
+
+            try (var statement = connection.createStatement();
+                 var result = statement.executeQuery("""
+                         select subject_template, body_template
+                         from notification.notification_templates
+                         where project_key = 'electrahub'
+                           and template_key = 'charging-receipt-ready'
+                           and channel = 'EMAIL'
+                           and country_code = 'IN'
+                         """)) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getString("subject_template")).contains("GST receipt");
+                assertThat(result.getString("body_template"))
+                        .contains("Tax invoice")
+                        .contains("GSTIN")
+                        .contains("Taxable value");
+                assertThat(result.next()).isFalse();
             }
         }
     }

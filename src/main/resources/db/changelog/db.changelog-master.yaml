@@ -7,3 +7,5 @@ databaseChangeLog:
       file: db/changelog/003-create-notification-template-catalog.yaml
   - include:
       file: db/changelog/004-fix-electrahub-sender.yaml
+  - include:
+      file: db/changelog/005-add-country-specific-receipt-templates.yaml

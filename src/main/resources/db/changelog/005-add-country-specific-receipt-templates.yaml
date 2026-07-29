@@ -1,0 +1,48 @@
+databaseChangeLog:
+  - changeSet:
+      id: 011-add-country-specific-receipt-templates
+      author: codex
+      changes:
+        - addColumn:
+            schemaName: notification
+            tableName: notification_templates
+            columns:
+              - column:
+                  name: country_code
+                  type: varchar(2)
+                  defaultValue: "*"
+                  constraints:
+                    nullable: false
+        - dropUniqueConstraint:
+            schemaName: notification
+            tableName: notification_templates
+            constraintName: uq_notification_template_version
+        - addUniqueConstraint:
+            schemaName: notification
+            tableName: notification_templates
+            columnNames: project_key, template_key, channel, locale, country_code, version
+            constraintName: uq_notification_template_version
+        - insert:
+            schemaName: notification
+            tableName: notification_templates
+            columns:
+              - column: { name: id, valueComputed: "CAST('1fbb78d5-95a8-4d48-91db-36ba988da69e' AS UUID)" }
+              - column: { name: project_key, value: electrahub }
+              - column: { name: template_key, value: charging-receipt-ready }
+              - column: { name: channel, value: EMAIL }
+              - column: { name: locale, value: en-US }
+              - column: { name: country_code, value: IN }
+              - column: { name: version, valueNumeric: 1 }
+              - column:
+                  name: subject_template
+                  valueClobFile: ../templates/electrahub/in/charging-receipt-email.subject.txt
+                  encoding: UTF-8
+              - column:
+                  name: body_template
+                  valueClobFile: ../templates/electrahub/in/charging-receipt-email.html
+                  encoding: UTF-8
+              - column: { name: content_type, value: "text/html; charset=UTF-8" }
+              - column: { name: enabled, valueBoolean: true }
+              - column: { name: created_at, valueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, valueComputed: CURRENT_TIMESTAMP }
+  

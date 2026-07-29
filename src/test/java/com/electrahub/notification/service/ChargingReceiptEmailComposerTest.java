@@ -60,7 +60,8 @@ class ChargingReceiptEmailComposerTest {
                 .containsEntry("hasIdleFee", true)
                 .containsEntry("hasSubscriptionDiscount", true)
                 .containsEntry("hasTaxLines", true)
-                .containsEntry("hasTaxRegistration", true);
+                .containsEntry("hasTaxRegistration", true)
+                .containsEntry("taxableAmount", "$4.21");
         assertThat(result.plainTextBody())
                 .contains("Central GST (9%): $0.16")
                 .contains("Karnataka GST (9%): $0.16")
@@ -72,10 +73,12 @@ class ChargingReceiptEmailComposerTest {
             try (var document = Loader.loadPDF(attachment.content())) {
                 String text = new PDFTextStripper().getText(document);
                 assertThat(text)
-                        .contains("Charging receipt")
+                        .contains("GST tax invoice")
                         .contains("LOC-SFO-001")
+                        .contains("Taxable value")
                         .contains("Central GST (9%)")
                         .contains("Karnataka GST (9%)")
+                        .contains("GSTIN")
                         .contains("29AAECE0000A1Z5")
                         .contains("Total paid")
                         .contains("$4.52");

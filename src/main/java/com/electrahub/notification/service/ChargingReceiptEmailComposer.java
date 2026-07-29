@@ -44,6 +44,7 @@ public class ChargingReceiptEmailComposer implements EmailComposer {
         BigDecimal total = decimal(payload, "totalCost");
         BigDecimal idleFee = decimal(payload, "idleFee");
         BigDecimal taxes = decimal(payload, "taxesUsd");
+        BigDecimal taxableAmount = total.subtract(taxes).max(BigDecimal.ZERO);
         BigDecimal discount = decimal(payload, "subscriptionDiscountAmount");
         BigDecimal chargingCost = payload.containsKey("chargingCost")
                 ? decimal(payload, "chargingCost")
@@ -68,6 +69,7 @@ public class ChargingReceiptEmailComposer implements EmailComposer {
                 money(idleFee, currency, locale),
                 "-" + money(discount.abs(), currency, locale),
                 money(taxes, currency, locale),
+                money(taxableAmount, currency, locale),
                 money(total, currency, locale),
                 defaultText(payload.get("paymentMethod"), "ElectraHub Wallet"),
                 titleCase(defaultText(payload.get("status"), "Completed")),

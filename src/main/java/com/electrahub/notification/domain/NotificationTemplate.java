@@ -31,6 +31,9 @@ public class NotificationTemplate {
     @Column(nullable = false, length = 16)
     private String locale;
 
+    @Column(nullable = false, length = 2)
+    private String countryCode;
+
     @Column(nullable = false)
     private int version;
 
@@ -66,11 +69,27 @@ public class NotificationTemplate {
             String contentType,
             boolean enabled
     ) {
+        this(projectKey, templateKey, channel, locale, "*", version, subjectTemplate, bodyTemplate, contentType, enabled);
+    }
+
+    public NotificationTemplate(
+            String projectKey,
+            String templateKey,
+            Channel channel,
+            String locale,
+            String countryCode,
+            int version,
+            String subjectTemplate,
+            String bodyTemplate,
+            String contentType,
+            boolean enabled
+    ) {
         this.id = UUID.randomUUID();
         this.projectKey = projectKey;
         this.templateKey = templateKey;
         this.channel = channel;
         this.locale = locale;
+        this.countryCode = countryCode;
         this.version = version;
         this.subjectTemplate = subjectTemplate;
         this.bodyTemplate = bodyTemplate;
@@ -100,6 +119,7 @@ public class NotificationTemplate {
     public String getTemplateKey() { return templateKey; }
     public Channel getChannel() { return channel; }
     public String getLocale() { return locale; }
+    public String getCountryCode() { return countryCode; }
     public int getVersion() { return version; }
     public String getSubjectTemplate() { return subjectTemplate; }
     public String getBodyTemplate() { return bodyTemplate; }

@@ -27,6 +27,7 @@ import java.util.Optional;
 @DependsOn("notificationLiquibase")
 public class NotificationTemplateCatalog implements ResourceLoaderAware {
     private static final Logger log = LoggerFactory.getLogger(NotificationTemplateCatalog.class);
+    private static final String GLOBAL_COUNTRY = "*";
 
     private final NotificationProjectRepository projectRepository;
     private final NotificationTemplateRepository templateRepository;
@@ -64,7 +65,8 @@ public class NotificationTemplateCatalog implements ResourceLoaderAware {
                     normalizeKey(template.getProjectKey()),
                     normalizeKey(template.getTemplateKey()),
                     template.getChannel(),
-                    normalizeLocale(template.getLocale())
+                    normalizeLocale(template.getLocale()),
+                    normalizeCountry(template.getCountryCode())
             );
             templates.merge(key, template, (current, candidate) ->
                     candidate.getVersion() > current.getVersion() ? candidate : current);
@@ -85,6 +87,16 @@ public class NotificationTemplateCatalog implements ResourceLoaderAware {
             Channel channel,
             String requestedLocale
     ) {
+        return template(projectKey, templateKey, channel, requestedLocale, null);
+    }
+
+    public Optional<NotificationTemplate> template(
+            String projectKey,
+            String templateKey,
+            Channel channel,
+            String requestedLocale,
+            String requestedCountryCode
+    ) {
         Snapshot current = snapshot;
         String normalizedProject = normalizeKey(projectKey);
         ProjectConfiguration project = current.projects().get(normalizedProject);
@@ -94,18 +106,32 @@ public class NotificationTemplateCatalog implements ResourceLoaderAware {
         String locale = requestedLocale == null || requestedLocale.isBlank()
                 ? normalizeLocale(project.project().getDefaultLocale())
                 : normalizeLocale(requestedLocale);
-        NotificationTemplate exact = current.templates().get(
-                new TemplateKey(normalizedProject, normalizeKey(templateKey), channel, locale));
-        if (exact != null) {
-            return Optional.of(exact);
+        String defaultLocale = normalizeLocale(project.project().getDefaultLocale());
+        String country = normalizeRequestedCountry(requestedCountryCode);
+        String normalizedTemplate = normalizeKey(templateKey);
+
+        NotificationTemplate match = find(current, normalizedProject, normalizedTemplate, channel, locale, country);
+        if (match == null && !locale.equals(defaultLocale)) {
+            match = find(current, normalizedProject, normalizedTemplate, channel, defaultLocale, country);
         }
-        return Optional.ofNullable(current.templates().get(
-                new TemplateKey(
-                        normalizedProject,
-                        normalizeKey(templateKey),
-                        channel,
-                        normalizeLocale(project.project().getDefaultLocale())
-                )));
+        if (match == null && !GLOBAL_COUNTRY.equals(country)) {
+            match = find(current, normalizedProject, normalizedTemplate, channel, locale, GLOBAL_COUNTRY);
+        }
+        if (match == null && !GLOBAL_COUNTRY.equals(country) && !locale.equals(defaultLocale)) {
+            match = find(current, normalizedProject, normalizedTemplate, channel, defaultLocale, GLOBAL_COUNTRY);
+        }
+        return Optional.ofNullable(match);
+    }
+
+    private NotificationTemplate find(
+            Snapshot snapshot,
+            String projectKey,
+            String templateKey,
+            Channel channel,
+            String locale,
+            String countryCode
+    ) {
+        return snapshot.templates().get(new TemplateKey(projectKey, templateKey, channel, locale, countryCode));
     }
 
     public int loadedProjectCount() {
@@ -171,6 +197,7 @@ public class NotificationTemplateCatalog implements ResourceLoaderAware {
             throw new IllegalStateException("Template version must be positive");
         }
         normalizeLocale(template.getLocale());
+        normalizeCountry(template.getCountryCode());
     }
 
     private String logoContentType(String path) {
@@ -198,13 +225,35 @@ public class NotificationTemplateCatalog implements ResourceLoaderAware {
         return locale.toLanguageTag();
     }
 
+    private static String normalizeRequestedCountry(String value) {
+        if (value == null || value.isBlank()) {
+            return GLOBAL_COUNTRY;
+        }
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        return normalized.matches("[A-Z]{2}") ? normalized : GLOBAL_COUNTRY;
+    }
+
+    private static String normalizeCountry(String value) {
+        String normalized = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+        if (!GLOBAL_COUNTRY.equals(normalized) && !normalized.matches("[A-Z]{2}")) {
+            throw new IllegalStateException("Invalid notification template country: " + value);
+        }
+        return normalized;
+    }
+
     private static void required(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalStateException(field + " is required");
         }
     }
 
-    private record TemplateKey(String projectKey, String templateKey, Channel channel, String locale) {
+    private record TemplateKey(
+            String projectKey,
+            String templateKey,
+            Channel channel,
+            String locale,
+            String countryCode
+    ) {
     }
 
     public record ProjectConfiguration(NotificationProject project, byte[] logoBytes, String logoContentType) {

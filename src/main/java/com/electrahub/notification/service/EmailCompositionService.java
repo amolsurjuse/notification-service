@@ -50,11 +50,13 @@ public class EmailCompositionService {
 
         NotificationProject project = configuration.project();
         String requestedLocale = text(payload == null ? null : payload.get("locale"));
+        String requestedCountry = text(payload == null ? null : payload.get("taxCountryCode"));
         NotificationTemplate template = catalog.template(
                 projectKey,
                 message.getTemplateId(),
                 Channel.EMAIL,
-                requestedLocale
+                requestedLocale,
+                requestedCountry
         ).orElse(null);
         if (template == null) {
             return Optional.empty();

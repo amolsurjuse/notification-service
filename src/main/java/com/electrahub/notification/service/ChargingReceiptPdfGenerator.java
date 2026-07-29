@@ -30,6 +30,7 @@ public class ChargingReceiptPdfGenerator {
             PDPage page = new PDPage(PDRectangle.LETTER);
             document.addPage(page);
             try (PDPageContentStream canvas = new PDPageContentStream(document, page)) {
+                boolean indiaReceipt = "IN".equalsIgnoreCase(receipt.taxCountryCode());
                 int[] brand = color(project.getPrimaryColor());
                 canvas.setNonStrokingColor(brand[0] / 255f, brand[1] / 255f, brand[2] / 255f);
                 canvas.addRect(0, PDRectangle.LETTER.getHeight() - 10, PDRectangle.LETTER.getWidth(), 10);
@@ -44,7 +45,8 @@ public class ChargingReceiptPdfGenerator {
                 float logoHeight = logoWidth * logo.getHeight() / logo.getWidth();
                 canvas.drawImage(logo, 48, 724, logoWidth, logoHeight);
 
-                text(canvas, BOLD, 22, 48, 684, "Charging receipt", 68, 82, 107);
+                text(canvas, BOLD, 22, 48, 684,
+                        indiaReceipt ? "GST tax invoice" : "Charging receipt", 68, 82, 107);
                 text(canvas, REGULAR, 10, 48, 666, receipt.receiptNumber(), 100, 116, 139);
                 text(canvas, BOLD, 12, 48, 632, receipt.stationName(), 15, 23, 42);
                 text(canvas, REGULAR, 10, 48, 616, receipt.connectorLabel(), 100, 116, 139);
@@ -61,6 +63,9 @@ public class ChargingReceiptPdfGenerator {
                 }
                 if (receipt.hasSubscriptionDiscount()) {
                     y = row(canvas, "Subscription discount", receipt.subscriptionDiscount(), y);
+                }
+                if (indiaReceipt) {
+                    y = row(canvas, "Taxable value", receipt.taxableAmount(), y);
                 }
                 if (receipt.hasTaxLines()) {
                     for (ChargingReceiptEmailModel.TaxDisplayLine taxLine : receipt.taxLines()) {
@@ -85,13 +90,18 @@ public class ChargingReceiptPdfGenerator {
                 }
                 if (receipt.hasTaxRegistration()) {
                     text(canvas, REGULAR, 9, 48, detailY - 65,
-                            receipt.supplierLegalName() + " tax registration: " + receipt.supplierTaxRegistration(),
+                            receipt.supplierLegalName()
+                                    + (indiaReceipt ? " GSTIN: " : " tax registration: ")
+                                    + receipt.supplierTaxRegistration(),
                             71, 85, 105);
                 }
 
                 line(canvas, 48, 98, 564, 98, 226, 232, 240);
                 text(canvas, REGULAR, 8, 48, 78,
-                        project.getLegalName() + " | " + project.getBusinessAddress(), 100, 116, 139);
+                        indiaReceipt
+                                ? receipt.supplierLegalName() + " | GSTIN " + receipt.supplierTaxRegistration()
+                                : project.getLegalName() + " | " + project.getBusinessAddress(),
+                        100, 116, 139);
                 text(canvas, REGULAR, 8, 48, 64,
                         "Questions? " + project.getSupportEmail(), 100, 116, 139);
                 textRight(canvas, REGULAR, 8, 564, 64,
