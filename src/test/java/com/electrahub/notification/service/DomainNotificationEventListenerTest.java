@@ -21,6 +21,12 @@ class DomainNotificationEventListenerTest {
     @Mock
     NotificationOrchestrator orchestrator;
 
+    @Mock
+    CommunicationPreferenceService communicationPreferenceService;
+
+    @Mock
+    SensitiveEmailDispatchService sensitiveEmailDispatchService;
+
     @Test
     void repeatedChargingMilestoneUsesOneSessionScopedIdempotencyKey() {
         DomainNotificationEventListener listener = listener();
@@ -155,8 +161,59 @@ class DomainNotificationEventListenerTest {
         });
     }
 
+    @Test
+    void accountCreationDoesNotCreateAnEmailNotification() {
+        DomainNotificationEventListener listener = listener();
+        when(orchestrator.submit(any())).thenReturn(List.of());
+        listener.onDomainEvent(event("event-account", "USER_ACCOUNT_CREATED", null));
+        ArgumentCaptor<NotificationDtos.SubmitNotificationRequest> requests =
+                ArgumentCaptor.forClass(NotificationDtos.SubmitNotificationRequest.class);
+        verify(orchestrator, times(2)).submit(requests.capture());
+        assertThat(requests.getAllValues())
+                .extracting(value -> value.channels().get(0))
+                .containsExactly(
+                        com.electrahub.notification.domain.Channel.PUSH,
+                        com.electrahub.notification.domain.Channel.IN_APP
+                );
+    }
+
+    @Test
+    void emailOtpUsesSensitiveDeliveryWithoutPersistingThroughOrchestrator() {
+        DomainNotificationEventListener listener = listener();
+        NotificationDtos.DomainNotificationEvent event = new NotificationDtos.DomainNotificationEvent(
+                "otp-event", "USER_EMAIL_OTP_REQUESTED", "electrahub",
+                "user@example.com", "user-1", "2026-07-15T12:00:00Z",
+                Map.of("challengeId", "challenge-1", "code", "123456")
+        );
+        listener.onDomainEvent(event);
+        verify(sensitiveEmailDispatchService).dispatchEmailOtp(event);
+        verify(orchestrator, times(0)).submit(any());
+    }
+
+    @Test
+    void disabledReceiptEmailStillCreatesPushAndInbox() {
+        DomainNotificationEventListener listener = listener();
+        when(orchestrator.submit(any())).thenReturn(List.of());
+        when(communicationPreferenceService.shouldDeliverReceiptEmail("electrahub", "user-1")).thenReturn(false);
+        listener.onDomainEvent(event("receipt-event", "CHARGING_RECEIPT_READY", "session-1"));
+        ArgumentCaptor<NotificationDtos.SubmitNotificationRequest> requests =
+                ArgumentCaptor.forClass(NotificationDtos.SubmitNotificationRequest.class);
+        verify(orchestrator, times(2)).submit(requests.capture());
+        assertThat(requests.getAllValues())
+                .extracting(value -> value.channels().get(0))
+                .containsExactly(
+                        com.electrahub.notification.domain.Channel.PUSH,
+                        com.electrahub.notification.domain.Channel.IN_APP
+                );
+    }
+
     private DomainNotificationEventListener listener() {
-        return new DomainNotificationEventListener(orchestrator, "https://driver.electrahub.net/reset-password");
+        return new DomainNotificationEventListener(
+                orchestrator,
+                communicationPreferenceService,
+                sensitiveEmailDispatchService,
+                "https://driver.electrahub.net/reset-password"
+        );
     }
 
     private NotificationDtos.DomainNotificationEvent event(String eventId, String eventType, String sessionId) {

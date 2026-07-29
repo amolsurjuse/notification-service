@@ -147,6 +147,34 @@ public final class NotificationDtos {
     ) {
     }
 
+    public record CommunicationPreferencesResponse(List<ChannelPreferenceResponse> channels) {
+    }
+
+    public record ChannelPreferenceResponse(
+            String channel,
+            String title,
+            boolean enabled,
+            boolean available,
+            boolean effectiveEnabled,
+            String blockedReason,
+            List<TopicPreferenceResponse> topics
+    ) {
+    }
+
+    public record TopicPreferenceResponse(
+            String topic,
+            String title,
+            boolean enabled,
+            boolean effectiveEnabled
+    ) {
+    }
+
+    public record UpdateEmailPreferencesRequest(
+            @NotNull Boolean enabled,
+            @NotNull Boolean receiptEnabled
+    ) {
+    }
+
     public record ContactSubmissionRequest(
             @NotBlank @Size(max = 160) String name,
             @NotBlank @Email @Size(max = 240) String email,

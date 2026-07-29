@@ -1,5 +1,6 @@
 package com.electrahub.notification.web;
 
+import com.electrahub.notification.service.CommunicationPreferenceService;
 import com.electrahub.notification.service.NotificationDtos;
 import com.electrahub.notification.service.InboxRealtimeService;
 import com.electrahub.notification.service.NotificationOrchestrator;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -31,10 +33,16 @@ public class NotificationController {
 
     private final NotificationOrchestrator orchestrator;
     private final InboxRealtimeService inboxRealtimeService;
+    private final CommunicationPreferenceService communicationPreferenceService;
 
-    public NotificationController(NotificationOrchestrator orchestrator, InboxRealtimeService inboxRealtimeService) {
+    public NotificationController(
+            NotificationOrchestrator orchestrator,
+            InboxRealtimeService inboxRealtimeService,
+            CommunicationPreferenceService communicationPreferenceService
+    ) {
         this.orchestrator = orchestrator;
         this.inboxRealtimeService = inboxRealtimeService;
+        this.communicationPreferenceService = communicationPreferenceService;
     }
 
     @PostMapping("/notifications")
@@ -101,6 +109,23 @@ public class NotificationController {
             @RequestHeader(AUTHENTICATED_USER_HEADER) String userId
     ) {
         return inboxRealtimeService.connect(tenantId, userId);
+    }
+
+    @GetMapping("/me/communication-preferences")
+    public NotificationDtos.CommunicationPreferencesResponse communicationPreferences(
+            @RequestHeader(AUTHENTICATED_TENANT_HEADER) String tenantId,
+            @RequestHeader(AUTHENTICATED_USER_HEADER) String userId
+    ) {
+        return communicationPreferenceService.get(tenantId, userId);
+    }
+
+    @PutMapping("/me/communication-preferences/email")
+    public NotificationDtos.CommunicationPreferencesResponse updateEmailPreferences(
+            @RequestHeader(AUTHENTICATED_TENANT_HEADER) String tenantId,
+            @RequestHeader(AUTHENTICATED_USER_HEADER) String userId,
+            @Valid @RequestBody NotificationDtos.UpdateEmailPreferencesRequest request
+    ) {
+        return communicationPreferenceService.updateEmail(tenantId, userId, request);
     }
 
     @PostMapping("/contacts")

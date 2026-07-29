@@ -22,19 +22,29 @@ public class DomainNotificationEventListener {
     private static final Logger log = LoggerFactory.getLogger(DomainNotificationEventListener.class);
 
     private final NotificationOrchestrator orchestrator;
+    private final CommunicationPreferenceService communicationPreferenceService;
+    private final SensitiveEmailDispatchService sensitiveEmailDispatchService;
     private final String driverResetPasswordUrl;
 
     public DomainNotificationEventListener(
             NotificationOrchestrator orchestrator,
+            CommunicationPreferenceService communicationPreferenceService,
+            SensitiveEmailDispatchService sensitiveEmailDispatchService,
             @Value("${notification.portal.driver-reset-password-url}") String driverResetPasswordUrl
     ) {
         this.orchestrator = orchestrator;
+        this.communicationPreferenceService = communicationPreferenceService;
+        this.sensitiveEmailDispatchService = sensitiveEmailDispatchService;
         this.driverResetPasswordUrl = driverResetPasswordUrl;
     }
 
     @RabbitListener(queues = "${notification.broker.domain-event-queue}")
     public void onDomainEvent(NotificationDtos.DomainNotificationEvent event) {
         withEventTrace(event.eventId(), () -> {
+            if ("USER_EMAIL_OTP_REQUESTED".equals(event.eventType())) {
+                sensitiveEmailDispatchService.dispatchEmailOtp(event);
+                return;
+            }
             List<Channel> channels = channelsFor(event.eventType());
             if (channels.isEmpty()) {
                 log.info("Ignoring notification domain event {} because no channel is configured", event.eventType());
@@ -55,6 +65,12 @@ public class DomainNotificationEventListener {
             OffsetDateTime occurredAt = parseOccurredAt(event.occurredAt());
 
             for (Channel channel : channels) {
+                if (channel == Channel.EMAIL
+                        && isReceiptEvent(event.eventType())
+                        && !communicationPreferenceService.shouldDeliverReceiptEmail(event.tenantId(), event.userId())) {
+                    log.info("Skipping optional receipt email for event {} because it is unavailable or disabled", event.eventId());
+                    continue;
+                }
                 String recipientRef = recipientFor(event, channel);
                 if (recipientRef == null) {
                     log.warn("Ignoring {} channel for event {} because no recipient is available", channel, event.eventType());
@@ -79,7 +95,8 @@ public class DomainNotificationEventListener {
 
     private List<Channel> channelsFor(String eventType) {
         return switch (eventType) {
-            case "USER_ACCOUNT_CREATED", "USER_PASSWORD_CHANGED" -> List.of(Channel.EMAIL, Channel.PUSH, Channel.IN_APP);
+            case "USER_ACCOUNT_CREATED" -> List.of(Channel.PUSH, Channel.IN_APP);
+            case "USER_PASSWORD_CHANGED" -> List.of(Channel.EMAIL, Channel.PUSH, Channel.IN_APP);
             case "USER_PASSWORD_RESET_REQUESTED", "USER_EMAIL_VERIFICATION_REQUESTED" -> List.of(Channel.EMAIL);
             case "CHARGING_SESSION_STARTED", "CHARGING_SESSION_STOPPED", "CHARGING_SESSION_START_TIMEOUT", "CHARGING_BATTERY_FULL",
                  "CHARGING_IDLE_WARNING", "CHARGING_IDLE_STARTED", "CHARGING_IDLE_FEE_STARTED", "CHARGING_LOW_BALANCE_STOP" -> List.of(Channel.PUSH, Channel.IN_APP);
@@ -90,6 +107,10 @@ public class DomainNotificationEventListener {
             case "SUPPORT_CONTACT_CREATED", "SUPPORT_ESCALATION_CREATED" -> List.of(Channel.EMAIL);
             default -> List.of();
         };
+    }
+
+    private boolean isReceiptEvent(String eventType) {
+        return "PAYMENT_RECEIPT_READY".equals(eventType) || "CHARGING_RECEIPT_READY".equals(eventType);
     }
 
     private String recipientFor(NotificationDtos.DomainNotificationEvent event, Channel channel) {

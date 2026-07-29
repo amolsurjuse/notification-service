@@ -1,0 +1,29 @@
+databaseChangeLog:
+  - changeSet:
+      id: 008-create-communication-preferences
+      author: codex
+      changes:
+        - createTable:
+            schemaName: notification
+            tableName: communication_preferences
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: varchar(128), constraints: { nullable: false } }
+              - column: { name: user_id, type: varchar(160), constraints: { nullable: false } }
+              - column: { name: channel, type: varchar(32), constraints: { nullable: false } }
+              - column: { name: topic, type: varchar(64), constraints: { nullable: false } }
+              - column: { name: enabled, type: boolean, constraints: { nullable: false } }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: updated_at, type: timestamptz, constraints: { nullable: false } }
+        - addUniqueConstraint:
+            schemaName: notification
+            tableName: communication_preferences
+            columnNames: tenant_id, user_id, channel, topic
+            constraintName: uq_communication_preferences_scope
+        - createIndex:
+            schemaName: notification
+            tableName: communication_preferences
+            indexName: idx_communication_preferences_user
+            columns:
+              - column: { name: tenant_id }
+              - column: { name: user_id }

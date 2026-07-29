@@ -1,5 +1,6 @@
 package com.electrahub.notification.web;
 
+import com.electrahub.notification.service.EmailNotVerifiedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -30,6 +31,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> invalid(IllegalArgumentException ex) {
         return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", ex.getMessage());
+    }
+
+    @ExceptionHandler(EmailNotVerifiedException.class)
+    public ResponseEntity<Map<String, Object>> emailNotVerified(EmailNotVerifiedException ex) {
+        return error(HttpStatus.CONFLICT, "EMAIL_NOT_VERIFIED", ex.getMessage());
     }
 
     @ExceptionHandler(NoSuchElementException.class)
