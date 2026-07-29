@@ -98,7 +98,7 @@ databaseChangeLog:
             schemaName: notification
             tableName: notification_templates
             columns:
-              - column: { name: id, value: 9d91be12-b538-4e12-bdf4-d05226b660d6 }
+              - column: { name: id, valueComputed: "CAST('9d91be12-b538-4e12-bdf4-d05226b660d6' AS UUID)" }
               - column: { name: project_key, value: electrahub }
               - column: { name: template_key, value: charging-receipt-ready }
               - column: { name: channel, value: EMAIL }
