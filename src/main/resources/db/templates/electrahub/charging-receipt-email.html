@@ -60,9 +60,13 @@
                         <td style="padding:7px 0;color:#047857;font-size:14px;">Subscription discount</td>
                         <td style="padding:7px 0;text-align:right;color:#047857;font-size:14px;" th:text="${subscriptionDiscount}">-$0.00</td>
                       </tr>
-                      <tr>
+                      <tr th:if="${!hasTaxLines}">
                         <td style="padding:7px 0;color:#475569;font-size:14px;">Taxes</td>
                         <td style="padding:7px 0;text-align:right;color:#0F172A;font-size:14px;" th:text="${taxes}">$0.00</td>
+                      </tr>
+                      <tr th:each="taxLine : ${taxLines}">
+                        <td style="padding:7px 0;color:#475569;font-size:14px;"><span th:text="${taxLine.label}">Tax</span> <span th:text="${'(' + taxLine.rate + ')'}">(0%)</span></td>
+                        <td style="padding:7px 0;text-align:right;color:#0F172A;font-size:14px;" th:text="${taxLine.amount}">$0.00</td>
                       </tr>
                       <tr>
                         <td colspan="2" style="padding:8px 0 0;"><div style="height:1px;background:#CBD5E1;"></div></td>
@@ -92,6 +96,7 @@
                 </tr>
               </table>
               <p th:if="${hasSubscriptionPlan}" style="margin:14px 0 0;color:#475569;font-size:13px;line-height:20px;">Plan: <strong th:text="${subscriptionPlanName}">Subscription</strong></p>
+              <p th:if="${hasTaxRegistration}" style="margin:14px 0 0;color:#475569;font-size:13px;line-height:20px;"><span th:text="${supplierLegalName}">Supplier</span> tax registration: <strong th:text="${supplierTaxRegistration}">Registration</strong></p>
               <p style="margin:18px 0 0;color:#64748B;font-size:13px;line-height:20px;">A PDF copy of this receipt is attached for your records.</p>
             </td>
           </tr>

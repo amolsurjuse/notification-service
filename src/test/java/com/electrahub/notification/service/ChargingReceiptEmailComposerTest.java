@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 
 import java.util.Map;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,6 +27,23 @@ class ChargingReceiptEmailComposerTest {
                 Map.entry("energyKwh", 8.125),
                 Map.entry("tariffPerKwh", 0.42),
                 Map.entry("taxesUsd", 0.31),
+                Map.entry("taxCountryCode", "IN"),
+                Map.entry("supplierLegalName", "ElectraHub India Pvt Ltd"),
+                Map.entry("supplierTaxRegistration", "29AAECE0000A1Z5"),
+                Map.entry("taxBreakdown", List.of(
+                        Map.of(
+                                "taxType", "CGST",
+                                "displayName", "Central GST",
+                                "rate", 9,
+                                "taxAmount", 0.155
+                        ),
+                        Map.of(
+                                "taxType", "SGST",
+                                "displayName", "Karnataka GST",
+                                "rate", 9,
+                                "taxAmount", 0.155
+                        )
+                )),
                 Map.entry("paymentMethod", "Visa ending in 4242"),
                 Map.entry("status", "COMPLETED"),
                 Map.entry("idleFee", 1.25),
@@ -40,7 +58,13 @@ class ChargingReceiptEmailComposerTest {
                 .containsEntry("receiptNumber", "EH-038FEA2E")
                 .containsEntry("energyDelivered", "8.125 kWh")
                 .containsEntry("hasIdleFee", true)
-                .containsEntry("hasSubscriptionDiscount", true);
+                .containsEntry("hasSubscriptionDiscount", true)
+                .containsEntry("hasTaxLines", true)
+                .containsEntry("hasTaxRegistration", true);
+        assertThat(result.plainTextBody())
+                .contains("Central GST (9%): $0.16")
+                .contains("Karnataka GST (9%): $0.16")
+                .contains("Supplier tax registration: 29AAECE0000A1Z5");
         assertThat(result.attachments()).singleElement().satisfies(attachment -> {
             assertThat(attachment.filename()).isEqualTo("electrahub-receipt-EH-038FEA2E.pdf");
             assertThat(attachment.contentType()).isEqualTo("application/pdf");
@@ -50,6 +74,9 @@ class ChargingReceiptEmailComposerTest {
                 assertThat(text)
                         .contains("Charging receipt")
                         .contains("LOC-SFO-001")
+                        .contains("Central GST (9%)")
+                        .contains("Karnataka GST (9%)")
+                        .contains("29AAECE0000A1Z5")
                         .contains("Total paid")
                         .contains("$4.52");
             }

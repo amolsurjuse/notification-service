@@ -52,6 +52,9 @@ public class ChargingReceiptEmailComposer implements EmailComposer {
         String sessionId = defaultText(payload.get("sessionId"), "unknown");
         OffsetDateTime startedAt = timestamp(payload.get("startedAt"));
         OffsetDateTime stoppedAt = timestamp(payload.get("stoppedAt"));
+        List<ChargingReceiptEmailModel.TaxDisplayLine> taxLines = taxLines(payload, currency, locale);
+        String supplierTaxRegistration = defaultText(payload.get("supplierTaxRegistration"), "");
+        String supplierLegalName = defaultText(payload.get("supplierLegalName"), project.getLegalName());
         ChargingReceiptEmailModel model = new ChargingReceiptEmailModel(
                 receiptNumber(sessionId),
                 sessionId,
@@ -69,9 +72,15 @@ public class ChargingReceiptEmailComposer implements EmailComposer {
                 defaultText(payload.get("paymentMethod"), "ElectraHub Wallet"),
                 titleCase(defaultText(payload.get("status"), "Completed")),
                 defaultText(payload.get("subscriptionPlanName"), "Subscription"),
+                defaultText(payload.get("taxCountryCode"), ""),
+                supplierTaxRegistration,
+                supplierLegalName,
+                taxLines,
                 idleFee.signum() > 0,
                 discount.signum() > 0,
-                text(payload.get("subscriptionPlanName")) != null
+                text(payload.get("subscriptionPlanName")) != null,
+                !supplierTaxRegistration.isBlank(),
+                !taxLines.isEmpty()
         );
 
         byte[] pdf = pdfGenerator.generate(model, configuration);
@@ -85,6 +94,26 @@ public class ChargingReceiptEmailComposer implements EmailComposer {
                 model.plainText(project.getDisplayName(), project.getSupportEmail()),
                 List.of(attachment)
         );
+    }
+
+    private List<ChargingReceiptEmailModel.TaxDisplayLine> taxLines(
+            Map<String, Object> payload,
+            String currency,
+            Locale locale
+    ) {
+        Object rawLines = payload.get("taxBreakdown");
+        if (!(rawLines instanceof List<?> lines)) {
+            return List.of();
+        }
+        return lines.stream()
+                .filter(Map.class::isInstance)
+                .map(Map.class::cast)
+                .map(line -> new ChargingReceiptEmailModel.TaxDisplayLine(
+                        defaultText(line.get("displayName"), defaultText(line.get("taxType"), "Tax")),
+                        decimal(line, "rate").stripTrailingZeros().toPlainString() + "%",
+                        money(decimal(line, "taxAmount"), currency, locale)
+                ))
+                .toList();
     }
 
     private String money(BigDecimal amount, String currencyCode, Locale locale) {

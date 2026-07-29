@@ -1,5 +1,6 @@
 package com.electrahub.notification.service;
 
+import java.util.List;
 import java.util.Map;
 
 public record ChargingReceiptEmailModel(
@@ -19,10 +20,23 @@ public record ChargingReceiptEmailModel(
         String paymentMethod,
         String status,
         String subscriptionPlanName,
+        String taxCountryCode,
+        String supplierTaxRegistration,
+        String supplierLegalName,
+        List<TaxDisplayLine> taxLines,
         boolean hasIdleFee,
         boolean hasSubscriptionDiscount,
-        boolean hasSubscriptionPlan
+        boolean hasSubscriptionPlan,
+        boolean hasTaxRegistration,
+        boolean hasTaxLines
 ) {
+    public ChargingReceiptEmailModel {
+        taxLines = taxLines == null ? List.of() : List.copyOf(taxLines);
+    }
+
+    public record TaxDisplayLine(String label, String rate, String amount) {
+    }
+
     public Map<String, Object> variables() {
         return Map.ofEntries(
                 Map.entry("receiptNumber", receiptNumber),
@@ -41,9 +55,15 @@ public record ChargingReceiptEmailModel(
                 Map.entry("paymentMethod", paymentMethod),
                 Map.entry("status", status),
                 Map.entry("subscriptionPlanName", subscriptionPlanName),
+                Map.entry("taxCountryCode", taxCountryCode),
+                Map.entry("supplierTaxRegistration", supplierTaxRegistration),
+                Map.entry("supplierLegalName", supplierLegalName),
+                Map.entry("taxLines", taxLines),
                 Map.entry("hasIdleFee", hasIdleFee),
                 Map.entry("hasSubscriptionDiscount", hasSubscriptionDiscount),
-                Map.entry("hasSubscriptionPlan", hasSubscriptionPlan)
+                Map.entry("hasSubscriptionPlan", hasSubscriptionPlan),
+                Map.entry("hasTaxRegistration", hasTaxRegistration),
+                Map.entry("hasTaxLines", hasTaxLines)
         );
     }
 
@@ -59,7 +79,7 @@ public record ChargingReceiptEmailModel(
                 Charging: %s
                 Idle fee: %s
                 Discount: %s
-                Taxes: %s
+                %s
                 Total: %s
                 Payment method: %s
                 Status: %s
@@ -76,11 +96,30 @@ public record ChargingReceiptEmailModel(
                 chargingCost,
                 idleFee,
                 subscriptionDiscount,
-                taxes,
+                plainTextTaxes(),
                 totalCost,
                 paymentMethod,
                 status,
                 supportEmail
         ).trim();
+    }
+
+    private String plainTextTaxes() {
+        if (taxLines.isEmpty()) {
+            return "Taxes: " + taxes;
+        }
+        StringBuilder result = new StringBuilder();
+        for (TaxDisplayLine line : taxLines) {
+            if (!result.isEmpty()) {
+                result.append(System.lineSeparator());
+            }
+            result.append(line.label()).append(" (").append(line.rate()).append("): ").append(line.amount());
+        }
+        if (hasTaxRegistration) {
+            result.append(System.lineSeparator())
+                    .append("Supplier tax registration: ")
+                    .append(supplierTaxRegistration);
+        }
+        return result.toString();
     }
 }

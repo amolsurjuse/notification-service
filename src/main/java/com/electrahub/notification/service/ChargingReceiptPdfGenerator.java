@@ -62,7 +62,13 @@ public class ChargingReceiptPdfGenerator {
                 if (receipt.hasSubscriptionDiscount()) {
                     y = row(canvas, "Subscription discount", receipt.subscriptionDiscount(), y);
                 }
-                y = row(canvas, "Taxes", receipt.taxes(), y);
+                if (receipt.hasTaxLines()) {
+                    for (ChargingReceiptEmailModel.TaxDisplayLine taxLine : receipt.taxLines()) {
+                        y = row(canvas, taxLine.label() + " (" + taxLine.rate() + ")", taxLine.amount(), y);
+                    }
+                } else {
+                    y = row(canvas, "Taxes", receipt.taxes(), y);
+                }
                 line(canvas, 48, y + 8, 564, y + 8, 203, 213, 225);
                 text(canvas, BOLD, 14, 48, y - 16, "Total paid", 15, 23, 42);
                 textRight(canvas, BOLD, 18, 564, y - 16, receipt.totalCost(), brand[0], brand[1], brand[2]);
@@ -76,6 +82,11 @@ public class ChargingReceiptPdfGenerator {
                 if (receipt.hasSubscriptionPlan()) {
                     text(canvas, REGULAR, 10, 48, detailY - 48,
                             "Plan: " + receipt.subscriptionPlanName(), 71, 85, 105);
+                }
+                if (receipt.hasTaxRegistration()) {
+                    text(canvas, REGULAR, 9, 48, detailY - 65,
+                            receipt.supplierLegalName() + " tax registration: " + receipt.supplierTaxRegistration(),
+                            71, 85, 105);
                 }
 
                 line(canvas, 48, 98, 564, 98, 226, 232, 240);
