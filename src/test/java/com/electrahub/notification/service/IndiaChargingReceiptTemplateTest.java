@@ -26,8 +26,7 @@ class IndiaChargingReceiptTemplateTest {
         );
 
         assertThat(rendered)
-                .contains("GST charging receipt")
-                .contains("Tax invoice")
+                .contains("GST tax invoice")
                 .contains("27AAECE0000A1Z5")
                 .contains("Taxable value")
                 .contains("CGST")
@@ -46,9 +45,25 @@ class IndiaChargingReceiptTemplateTest {
                 Map.entry("sessionId", "india-session-001"),
                 Map.entry("supplierLegalName", "ElectraHub India Pvt Ltd"),
                 Map.entry("supplierTaxRegistration", "27AAECE0000A1Z5"),
+                Map.entry("documentTitle", "GST tax invoice"),
+                Map.entry("hasComplianceNotice", false),
+                Map.entry("complianceNotice", ""),
+                Map.entry("hasSupplierAddress", true),
+                Map.entry("supplierAddress", "Pune, Maharashtra, India"),
+                Map.entry("hasCustomer", false),
+                Map.entry("customerName", ""),
+                Map.entry("customerAddress", ""),
+                Map.entry("customerTaxRegistration", ""),
+                Map.entry("hasInvoiceDetails", true),
+                Map.entry("serviceDescription", "Electric vehicle charging service"),
+                Map.entry("classificationCode", "998714"),
+                Map.entry("placeOfSupply", "27 Maharashtra"),
+                Map.entry("countryDetails", List.of()),
+                Map.entry("declarations", List.of("Tax is charged under GST.")),
                 Map.entry("stationName", "Pune Charging Hub"),
                 Map.entry("connectorLabel", "Connector 1"),
                 Map.entry("sessionDate", "29 Jul 2026, 5:00 pm"),
+                Map.entry("invoiceDate", "29 Jul 2026, 5:15 pm"),
                 Map.entry("sessionDuration", "15 minutes"),
                 Map.entry("energyDelivered", "1.500 kWh"),
                 Map.entry("energyRate", "INR 18.00 / kWh"),
@@ -66,8 +81,8 @@ class IndiaChargingReceiptTemplateTest {
                 Map.entry("hasSubscriptionPlan", false),
                 Map.entry("hasTaxLines", true),
                 Map.entry("taxLines", List.of(
-                        new ChargingReceiptEmailModel.TaxDisplayLine("CGST", "9%", "INR 9.00"),
-                        new ChargingReceiptEmailModel.TaxDisplayLine("SGST", "9%", "INR 9.00")
+                        new ChargingReceiptEmailModel.TaxDisplayLine("CGST", "9%", "INR 100.00", "INR 9.00"),
+                        new ChargingReceiptEmailModel.TaxDisplayLine("SGST", "9%", "INR 100.00", "INR 9.00")
                 ))
         );
     }

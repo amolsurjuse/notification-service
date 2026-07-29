@@ -39,6 +39,7 @@ class NotificationTemplateMigrationTest {
                            and t.template_key = 'charging-receipt-ready'
                            and t.channel = 'EMAIL'
                            and t.country_code = '*'
+                           and t.version = 2
                          """)) {
                 assertThat(result.next()).isTrue();
                 assertThat(result.getString("display_name")).isEqualTo("ElectraHub");
@@ -57,6 +58,7 @@ class NotificationTemplateMigrationTest {
                            and template_key = 'charging-receipt-ready'
                            and channel = 'EMAIL'
                            and country_code = 'IN'
+                           and version = 2
                          """)) {
                 assertThat(result.next()).isTrue();
                 assertThat(result.getString("subject_template")).contains("GST receipt");

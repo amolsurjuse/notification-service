@@ -9,6 +9,7 @@ public record ChargingReceiptEmailModel(
         String stationName,
         String connectorLabel,
         String sessionDate,
+        String invoiceDate,
         String sessionDuration,
         String energyDelivered,
         String energyRate,
@@ -25,17 +26,39 @@ public record ChargingReceiptEmailModel(
         String supplierTaxRegistration,
         String supplierLegalName,
         List<TaxDisplayLine> taxLines,
+        String documentTitle,
+        String complianceStatus,
+        String supplierAddress,
+        String supplierBusinessRegistration,
+        String customerName,
+        String customerAddress,
+        String customerTaxRegistration,
+        String serviceDescription,
+        String classificationCode,
+        String placeOfSupply,
+        List<String> declarations,
+        List<DetailLine> countryDetails,
+        String complianceNotice,
         boolean hasIdleFee,
         boolean hasSubscriptionDiscount,
         boolean hasSubscriptionPlan,
         boolean hasTaxRegistration,
-        boolean hasTaxLines
+        boolean hasTaxLines,
+        boolean hasSupplierAddress,
+        boolean hasCustomer,
+        boolean hasInvoiceDetails,
+        boolean hasComplianceNotice
 ) {
     public ChargingReceiptEmailModel {
         taxLines = taxLines == null ? List.of() : List.copyOf(taxLines);
+        declarations = declarations == null ? List.of() : List.copyOf(declarations);
+        countryDetails = countryDetails == null ? List.of() : List.copyOf(countryDetails);
     }
 
-    public record TaxDisplayLine(String label, String rate, String amount) {
+    public record TaxDisplayLine(String label, String rate, String taxableAmount, String amount) {
+    }
+
+    public record DetailLine(String label, String value) {
     }
 
     public Map<String, Object> variables() {
@@ -45,6 +68,7 @@ public record ChargingReceiptEmailModel(
                 Map.entry("stationName", stationName),
                 Map.entry("connectorLabel", connectorLabel),
                 Map.entry("sessionDate", sessionDate),
+                Map.entry("invoiceDate", invoiceDate),
                 Map.entry("sessionDuration", sessionDuration),
                 Map.entry("energyDelivered", energyDelivered),
                 Map.entry("energyRate", energyRate),
@@ -61,11 +85,28 @@ public record ChargingReceiptEmailModel(
                 Map.entry("supplierTaxRegistration", supplierTaxRegistration),
                 Map.entry("supplierLegalName", supplierLegalName),
                 Map.entry("taxLines", taxLines),
+                Map.entry("documentTitle", documentTitle),
+                Map.entry("complianceStatus", complianceStatus),
+                Map.entry("supplierAddress", supplierAddress),
+                Map.entry("supplierBusinessRegistration", supplierBusinessRegistration),
+                Map.entry("customerName", customerName),
+                Map.entry("customerAddress", customerAddress),
+                Map.entry("customerTaxRegistration", customerTaxRegistration),
+                Map.entry("serviceDescription", serviceDescription),
+                Map.entry("classificationCode", classificationCode),
+                Map.entry("placeOfSupply", placeOfSupply),
+                Map.entry("declarations", declarations),
+                Map.entry("countryDetails", countryDetails),
+                Map.entry("complianceNotice", complianceNotice),
                 Map.entry("hasIdleFee", hasIdleFee),
                 Map.entry("hasSubscriptionDiscount", hasSubscriptionDiscount),
                 Map.entry("hasSubscriptionPlan", hasSubscriptionPlan),
                 Map.entry("hasTaxRegistration", hasTaxRegistration),
-                Map.entry("hasTaxLines", hasTaxLines)
+                Map.entry("hasTaxLines", hasTaxLines),
+                Map.entry("hasSupplierAddress", hasSupplierAddress),
+                Map.entry("hasCustomer", hasCustomer),
+                Map.entry("hasInvoiceDetails", hasInvoiceDetails),
+                Map.entry("hasComplianceNotice", hasComplianceNotice)
         );
     }
 
@@ -76,6 +117,7 @@ public record ChargingReceiptEmailModel(
                 Station: %s
                 Connector: %s
                 Date: %s
+                Invoice issued: %s
                 Duration: %s
                 Energy: %s
                 Charging: %s
@@ -85,6 +127,12 @@ public record ChargingReceiptEmailModel(
                 Total: %s
                 Payment method: %s
                 Status: %s
+                Document: %s (%s)
+                Supplier: %s
+                Supplier address: %s
+                Customer: %s
+                Service: %s
+                %s
 
                 A PDF copy is attached. Questions: %s
                 """.formatted(
@@ -93,6 +141,7 @@ public record ChargingReceiptEmailModel(
                 stationName,
                 connectorLabel,
                 sessionDate,
+                invoiceDate,
                 sessionDuration,
                 energyDelivered,
                 chargingCost,
@@ -102,8 +151,35 @@ public record ChargingReceiptEmailModel(
                 totalCost,
                 paymentMethod,
                 status,
+                documentTitle,
+                complianceStatus,
+                supplierLegalName,
+                supplierAddress,
+                customerName,
+                serviceDescription,
+                plainTextLegalDetails(),
                 supportEmail
         ).trim();
+    }
+
+    private String plainTextLegalDetails() {
+        StringBuilder result = new StringBuilder();
+        if (!classificationCode.isBlank()) {
+            result.append("Classification: ").append(classificationCode).append(System.lineSeparator());
+        }
+        if (!placeOfSupply.isBlank()) {
+            result.append("Place of supply: ").append(placeOfSupply).append(System.lineSeparator());
+        }
+        for (DetailLine detail : countryDetails) {
+            result.append(detail.label()).append(": ").append(detail.value()).append(System.lineSeparator());
+        }
+        for (String declaration : declarations) {
+            result.append(declaration).append(System.lineSeparator());
+        }
+        if (hasComplianceNotice) {
+            result.append(complianceNotice);
+        }
+        return result.toString().trim();
     }
 
     private String plainTextTaxes() {
@@ -115,7 +191,8 @@ public record ChargingReceiptEmailModel(
             if (!result.isEmpty()) {
                 result.append(System.lineSeparator());
             }
-            result.append(line.label()).append(" (").append(line.rate()).append("): ").append(line.amount());
+            result.append(line.label()).append(" (").append(line.rate()).append(") on ")
+                    .append(line.taxableAmount()).append(": ").append(line.amount());
         }
         if (hasTaxRegistration) {
             result.append(System.lineSeparator())

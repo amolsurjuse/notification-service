@@ -30,17 +30,35 @@ class ChargingReceiptEmailComposerTest {
                 Map.entry("taxCountryCode", "IN"),
                 Map.entry("supplierLegalName", "ElectraHub India Pvt Ltd"),
                 Map.entry("supplierTaxRegistration", "29AAECE0000A1Z5"),
+                Map.entry("invoice", Map.ofEntries(
+                        Map.entry("invoiceNumber", "EHIN/2627/000001"),
+                        Map.entry("documentType", "GST_TAX_INVOICE"),
+                        Map.entry("complianceStatus", "COMPLIANT"),
+                        Map.entry("supplier", Map.of(
+                                "legalName", "ElectraHub India Pvt Ltd",
+                                "address", "Bengaluru, Karnataka, India",
+                                "taxRegistrationNumber", "29AAECE0000A1Z5"
+                        )),
+                        Map.entry("serviceDescription", "Electric vehicle charging service"),
+                        Map.entry("classificationCode", "998714"),
+                        Map.entry("placeOfSupply", "29 Karnataka"),
+                        Map.entry("declarations", List.of("Tax is charged under GST.")),
+                        Map.entry("countryAttributes", Map.of("Supplier state code", "29")),
+                        Map.entry("complianceErrors", List.of())
+                )),
                 Map.entry("taxBreakdown", List.of(
                         Map.of(
                                 "taxType", "CGST",
                                 "displayName", "Central GST",
                                 "rate", 9,
+                                "taxableAmount", 1.72,
                                 "taxAmount", 0.155
                         ),
                         Map.of(
                                 "taxType", "SGST",
                                 "displayName", "Karnataka GST",
                                 "rate", 9,
+                                "taxableAmount", 1.72,
                                 "taxAmount", 0.155
                         )
                 )),
@@ -55,7 +73,7 @@ class ChargingReceiptEmailComposerTest {
         ), configuration);
 
         assertThat(result.variables())
-                .containsEntry("receiptNumber", "EH-038FEA2E")
+                .containsEntry("receiptNumber", "EHIN/2627/000001")
                 .containsEntry("energyDelivered", "8.125 kWh")
                 .containsEntry("hasIdleFee", true)
                 .containsEntry("hasSubscriptionDiscount", true)
@@ -63,11 +81,11 @@ class ChargingReceiptEmailComposerTest {
                 .containsEntry("hasTaxRegistration", true)
                 .containsEntry("taxableAmount", "$4.21");
         assertThat(result.plainTextBody())
-                .contains("Central GST (9%): $0.16")
-                .contains("Karnataka GST (9%): $0.16")
+                .contains("Central GST (9%) on $1.72: $0.16")
+                .contains("Karnataka GST (9%) on $1.72: $0.16")
                 .contains("Supplier tax registration: 29AAECE0000A1Z5");
         assertThat(result.attachments()).singleElement().satisfies(attachment -> {
-            assertThat(attachment.filename()).isEqualTo("electrahub-receipt-EH-038FEA2E.pdf");
+            assertThat(attachment.filename()).isEqualTo("electrahub-receipt-EHIN-2627-000001.pdf");
             assertThat(attachment.contentType()).isEqualTo("application/pdf");
             assertThat(new String(attachment.content(), 0, 5)).isEqualTo("%PDF-");
             try (var document = Loader.loadPDF(attachment.content())) {

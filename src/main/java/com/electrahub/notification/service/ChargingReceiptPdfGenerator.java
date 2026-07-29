@@ -46,12 +46,13 @@ public class ChargingReceiptPdfGenerator {
                 canvas.drawImage(logo, 48, 724, logoWidth, logoHeight);
 
                 text(canvas, BOLD, 22, 48, 684,
-                        indiaReceipt ? "GST tax invoice" : "Charging receipt", 68, 82, 107);
+                        receipt.documentTitle(), 68, 82, 107);
                 text(canvas, REGULAR, 10, 48, 666, receipt.receiptNumber(), 100, 116, 139);
                 text(canvas, BOLD, 12, 48, 632, receipt.stationName(), 15, 23, 42);
                 text(canvas, REGULAR, 10, 48, 616, receipt.connectorLabel(), 100, 116, 139);
-                text(canvas, BOLD, 10, 380, 632, receipt.sessionDate(), 15, 23, 42);
-                text(canvas, REGULAR, 10, 380, 616, receipt.sessionDuration(), 100, 116, 139);
+                text(canvas, BOLD, 10, 380, 632, receipt.invoiceDate(), 15, 23, 42);
+                text(canvas, REGULAR, 9, 380, 616, "Supply " + receipt.sessionDate(), 100, 116, 139);
+                text(canvas, REGULAR, 9, 380, 602, receipt.sessionDuration(), 100, 116, 139);
 
                 line(canvas, 48, 595, 564, 595, 203, 213, 225);
                 float y = 570;
@@ -69,6 +70,7 @@ public class ChargingReceiptPdfGenerator {
                 }
                 if (receipt.hasTaxLines()) {
                     for (ChargingReceiptEmailModel.TaxDisplayLine taxLine : receipt.taxLines()) {
+                        y = row(canvas, taxLine.label() + " taxable base", taxLine.taxableAmount(), y);
                         y = row(canvas, taxLine.label() + " (" + taxLine.rate() + ")", taxLine.amount(), y);
                     }
                 } else {
@@ -95,6 +97,10 @@ public class ChargingReceiptPdfGenerator {
                                     + receipt.supplierTaxRegistration(),
                             71, 85, 105);
                 }
+                if (receipt.hasComplianceNotice()) {
+                    text(canvas, BOLD, 8, 48, detailY - 82,
+                            receipt.complianceNotice(), 180, 83, 9);
+                }
 
                 line(canvas, 48, 98, 564, 98, 226, 232, 240);
                 text(canvas, REGULAR, 8, 48, 78,
@@ -107,11 +113,109 @@ public class ChargingReceiptPdfGenerator {
                 textRight(canvas, REGULAR, 8, 564, 64,
                         "Session " + receipt.sessionId(), 100, 116, 139);
             }
+            if (hasLegalDetails(receipt)) {
+                addLegalDetailsPage(document, receipt, configuration);
+            }
             document.save(output);
             return output.toByteArray();
         } catch (IOException ex) {
             throw new UncheckedIOException("Could not generate charging receipt PDF", ex);
         }
+    }
+
+    private boolean hasLegalDetails(ChargingReceiptEmailModel receipt) {
+        return receipt.hasTaxRegistration() || receipt.hasSupplierAddress() || receipt.hasCustomer()
+                || receipt.hasInvoiceDetails() || receipt.hasComplianceNotice();
+    }
+
+    private void addLegalDetailsPage(
+            PDDocument document,
+            ChargingReceiptEmailModel receipt,
+            NotificationTemplateCatalog.ProjectConfiguration configuration
+    ) throws IOException {
+        PDPage page = new PDPage(PDRectangle.LETTER);
+        document.addPage(page);
+        try (PDPageContentStream canvas = new PDPageContentStream(document, page)) {
+            int[] brand = color(configuration.project().getPrimaryColor());
+            canvas.setNonStrokingColor(brand[0] / 255f, brand[1] / 255f, brand[2] / 255f);
+            canvas.addRect(0, PDRectangle.LETTER.getHeight() - 10, PDRectangle.LETTER.getWidth(), 10);
+            canvas.fill();
+            text(canvas, BOLD, 18, 48, 742, receipt.documentTitle() + " details", 15, 23, 42);
+            text(canvas, REGULAR, 9, 48, 724,
+                    receipt.receiptNumber() + " | " + receipt.complianceStatus(), 100, 116, 139);
+
+            float y = 690;
+            y = legalSection(canvas, "Supplier", receipt.supplierLegalName(), y);
+            y = legalLine(canvas, "Address", receipt.supplierAddress(), y);
+            y = legalLine(canvas, "Tax registration", receipt.supplierTaxRegistration(), y);
+            y = legalLine(canvas, "Business registration", receipt.supplierBusinessRegistration(), y);
+            if (receipt.hasCustomer()) {
+                y -= 8;
+                y = legalSection(canvas, "Customer", receipt.customerName(), y);
+                y = legalLine(canvas, "Address", receipt.customerAddress(), y);
+                y = legalLine(canvas, "Tax registration", receipt.customerTaxRegistration(), y);
+            }
+            y -= 8;
+            y = legalSection(canvas, "Supply", receipt.serviceDescription(), y);
+            y = legalLine(canvas, "Classification", receipt.classificationCode(), y);
+            y = legalLine(canvas, "Place of supply", receipt.placeOfSupply(), y);
+            for (ChargingReceiptEmailModel.DetailLine detail : receipt.countryDetails()) {
+                y = legalLine(canvas, detail.label(), detail.value(), y);
+            }
+            for (String declaration : receipt.declarations()) {
+                y = legalLine(canvas, "Declaration", declaration, y);
+            }
+            if (receipt.hasComplianceNotice()) {
+                y -= 8;
+                legalLine(canvas, "Compliance notice", receipt.complianceNotice(), y);
+            }
+
+            line(canvas, 48, 72, 564, 72, 226, 232, 240);
+            text(canvas, REGULAR, 8, 48, 52,
+                    "Session " + receipt.sessionId(), 100, 116, 139);
+        }
+    }
+
+    private float legalSection(PDPageContentStream canvas, String label, String value, float y) throws IOException {
+        text(canvas, BOLD, 11, 48, y, label, 15, 23, 42);
+        return writeWrapped(canvas, BOLD, 10, 175, y, value, 15, 23, 42);
+    }
+
+    private float legalLine(PDPageContentStream canvas, String label, String value, float y) throws IOException {
+        if (value == null || value.isBlank()) {
+            return y;
+        }
+        text(canvas, REGULAR, 9, 48, y, label, 100, 116, 139);
+        return writeWrapped(canvas, REGULAR, 9, 175, y, value, 15, 23, 42);
+    }
+
+    private float writeWrapped(
+            PDPageContentStream canvas,
+            PDFont font,
+            float size,
+            float x,
+            float y,
+            String value,
+            int red,
+            int green,
+            int blue
+    ) throws IOException {
+        String remaining = value == null ? "" : value.trim();
+        float currentY = y;
+        while (!remaining.isEmpty()) {
+            int end = Math.min(74, remaining.length());
+            if (end < remaining.length()) {
+                int space = remaining.lastIndexOf(' ', end);
+                if (space > 20) {
+                    end = space;
+                }
+            }
+            String line = remaining.substring(0, end).trim();
+            text(canvas, font, size, x, currentY, line, red, green, blue);
+            remaining = remaining.substring(end).trim();
+            currentY -= 14;
+        }
+        return currentY - 8;
     }
 
     private float row(PDPageContentStream canvas, String label, String value, float y) throws IOException {

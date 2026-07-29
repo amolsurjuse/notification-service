@@ -9,3 +9,5 @@ databaseChangeLog:
       file: db/changelog/004-fix-electrahub-sender.yaml
   - include:
       file: db/changelog/005-add-country-specific-receipt-templates.yaml
+  - include:
+      file: db/changelog/006-upgrade-compliant-receipt-templates.yaml
