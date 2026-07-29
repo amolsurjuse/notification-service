@@ -4,6 +4,7 @@ import com.electrahub.notification.domain.Channel;
 import com.electrahub.notification.repository.NotificationMessageRepository;
 import com.electrahub.notification.repository.PushDeviceRegistrationRepository;
 import com.electrahub.notification.service.ChannelAdapter;
+import com.electrahub.notification.service.EmailCompositionService;
 import com.electrahub.notification.service.FirebasePushAdapter;
 import com.electrahub.notification.service.FirebasePushSender;
 import com.electrahub.notification.service.NoopChannelAdapter;
@@ -85,6 +86,7 @@ public class ChannelAdapterConfig {
             NotificationMessageRepository notificationRepository,
             PushDeviceRegistrationRepository pushDeviceRepository,
             ObjectMapper objectMapper,
+            EmailCompositionService emailCompositionService,
             Clock clock,
             FirebasePushSender firebasePushSender,
             @Value("${notification.channel.email.real-send-enabled:false}") boolean emailEnabled,
@@ -122,6 +124,7 @@ public class ChannelAdapterConfig {
                                         emailWriteTimeoutMs
                                 ),
                                 objectMapper,
+                                emailCompositionService,
                                 emailProvider,
                                 emailSmtpHost,
                                 emailFromEmail,

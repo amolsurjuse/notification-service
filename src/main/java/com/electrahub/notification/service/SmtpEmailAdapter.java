@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -26,10 +27,12 @@ public class SmtpEmailAdapter implements ChannelAdapter {
     private final String host;
     private final String fromEmail;
     private final String fromName;
+    private final EmailCompositionService emailCompositionService;
 
     public SmtpEmailAdapter(
             JavaMailSender mailSender,
             ObjectMapper objectMapper,
+            EmailCompositionService emailCompositionService,
             String provider,
             String host,
             String fromEmail,
@@ -37,6 +40,7 @@ public class SmtpEmailAdapter implements ChannelAdapter {
     ) {
         this.mailSender = mailSender;
         this.objectMapper = objectMapper;
+        this.emailCompositionService = emailCompositionService;
         this.provider = blankToDefault(provider, "smtp-email");
         this.host = trimToNull(host);
         this.fromEmail = trimToNull(fromEmail);
@@ -53,9 +57,6 @@ public class SmtpEmailAdapter implements ChannelAdapter {
         if (host == null) {
             return DispatchResult.failure(provider, "SMTP_NOT_CONFIGURED host is required");
         }
-        if (!looksLikeEmail(fromEmail)) {
-            return DispatchResult.failure(provider, "SMTP_FROM_EMAIL_REQUIRED");
-        }
 
         Map<String, Object> payload = parsePayload(message.getPayloadJson());
         String to = resolveRecipient(message, payload);
@@ -64,23 +65,68 @@ public class SmtpEmailAdapter implements ChannelAdapter {
         }
 
         try {
+            ComposedEmail composed = emailCompositionService.compose(message, payload).orElse(null);
+            if (composed != null) {
+                message.recordRenderedTemplate(
+                        composed.projectKey(),
+                        composed.templateVersion(),
+                        composed.contentType(),
+                        composed.subject(),
+                        composed.renderedBody()
+                );
+            }
+            String effectiveFromEmail = composed == null ? fromEmail : composed.fromEmail();
+            String effectiveFromName = composed == null ? fromName : composed.fromName();
+            if (!looksLikeEmail(effectiveFromEmail)) {
+                return DispatchResult.failure(provider, "SMTP_FROM_EMAIL_REQUIRED");
+            }
+
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(
                     mimeMessage,
                     MimeMessageHelper.MULTIPART_MODE_MIXED_RELATED,
                     StandardCharsets.UTF_8.name()
             );
-            helper.setFrom(fromAddress());
+            helper.setFrom(fromAddress(effectiveFromEmail, effectiveFromName));
             helper.setTo(to);
-            helper.setSubject(defaultString(message.getSubject(), "ElectraHub notification"));
-            String htmlBody = firstText(payload, "htmlBody", "bodyHtml", "html");
-            if (htmlBody != null) {
-                helper.setText(defaultString(message.getBody(), ""), htmlBody);
+            if (composed != null && looksLikeEmail(composed.replyToEmail())) {
+                helper.setReplyTo(composed.replyToEmail());
+            }
+            if (composed == null) {
+                helper.setSubject(defaultString(message.getSubject(), "ElectraHub notification"));
+                String htmlBody = firstText(payload, "htmlBody", "bodyHtml", "html");
+                if (htmlBody != null) {
+                    helper.setText(defaultString(message.getBody(), ""), htmlBody);
+                } else {
+                    helper.setText(defaultString(message.getBody(), ""));
+                }
             } else {
-                helper.setText(defaultString(message.getBody(), ""));
+                helper.setSubject(defaultString(composed.subject(), "ElectraHub notification"));
+                if (composed.html()) {
+                    helper.setText(composed.plainTextBody(), composed.renderedBody());
+                } else {
+                    helper.setText(composed.renderedBody());
+                }
+                for (EmailInlineResource resource : composed.inlineResources()) {
+                    helper.addInline(
+                            resource.contentId(),
+                            new ByteArrayResource(resource.content()),
+                            resource.contentType()
+                    );
+                }
+                for (EmailAttachment attachment : composed.attachments()) {
+                    helper.addAttachment(
+                            attachment.filename(),
+                            new ByteArrayResource(attachment.content()),
+                            attachment.contentType()
+                    );
+                }
             }
             mailSender.send(mimeMessage);
-            return DispatchResult.success(provider, message.getId().toString());
+            return DispatchResult.success(
+                    provider,
+                    defaultString(mimeMessage.getMessageID(), message.getId().toString())
+            );
         } catch (MailException | MessagingException | UnsupportedEncodingException ex) {
             return DispatchResult.failure(provider, ex.getClass().getSimpleName() + ": " + ex.getMessage());
         } catch (RuntimeException ex) {
@@ -88,11 +134,12 @@ public class SmtpEmailAdapter implements ChannelAdapter {
         }
     }
 
-    private InternetAddress fromAddress() throws MessagingException, UnsupportedEncodingException {
-        if (fromName == null) {
-            return new InternetAddress(fromEmail);
+    private InternetAddress fromAddress(String email, String name)
+            throws MessagingException, UnsupportedEncodingException {
+        if (name == null || name.isBlank()) {
+            return new InternetAddress(email);
         }
-        return new InternetAddress(fromEmail, fromName, StandardCharsets.UTF_8.name());
+        return new InternetAddress(email, name, StandardCharsets.UTF_8.name());
     }
 
     private String resolveRecipient(NotificationMessage message, Map<String, Object> payload) {

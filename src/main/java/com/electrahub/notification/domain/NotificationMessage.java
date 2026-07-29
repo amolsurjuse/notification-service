@@ -40,8 +40,16 @@ public class NotificationMessage {
     @Column(length = 240)
     private String subject;
 
-    @Column(length = 2000)
+    @Column(columnDefinition = "text")
     private String body;
+
+    @Column(length = 64)
+    private String templateProjectKey;
+
+    private Integer templateVersion;
+
+    @Column(length = 80)
+    private String renderedContentType;
 
     @Column(columnDefinition = "text")
     private String payloadJson;
@@ -111,6 +119,9 @@ public class NotificationMessage {
     public String getTemplateId() { return templateId; }
     public String getSubject() { return subject; }
     public String getBody() { return body; }
+    public String getTemplateProjectKey() { return templateProjectKey; }
+    public Integer getTemplateVersion() { return templateVersion; }
+    public String getRenderedContentType() { return renderedContentType; }
     public String getPayloadJson() { return payloadJson; }
     public DeliveryStatus getStatus() { return status; }
     public int getAttempts() { return attempts; }
@@ -126,6 +137,20 @@ public class NotificationMessage {
     public void setBody(String body) { this.body = body; }
     public void setPayloadJson(String payloadJson) { this.payloadJson = payloadJson; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
+
+    public void recordRenderedTemplate(
+            String projectKey,
+            int version,
+            String contentType,
+            String renderedSubject,
+            String renderedBody
+    ) {
+        this.templateProjectKey = projectKey;
+        this.templateVersion = version;
+        this.renderedContentType = contentType;
+        this.subject = renderedSubject;
+        this.body = renderedBody;
+    }
 
     public void markDispatched(String provider, String providerMessageId) {
         this.status = channel == Channel.IN_APP ? DeliveryStatus.DELIVERED : DeliveryStatus.DISPATCHED;

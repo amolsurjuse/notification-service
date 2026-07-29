@@ -3,3 +3,5 @@ databaseChangeLog:
       file: db/changelog/001-create-notification-schema.yaml
   - include:
       file: db/changelog/002-create-communication-preferences.yaml
+  - include:
+      file: db/changelog/003-create-notification-template-catalog.yaml

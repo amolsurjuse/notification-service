@@ -9,6 +9,10 @@ The notification service owns asynchronous notification intake, idempotency, dis
 - `SMS`: queued through the channel adapter registry. Current production deployment uses a no-op adapter until Twilio secrets and compliance setup are complete.
 - `PUSH`: queued through the channel adapter registry. Current production deployment uses a no-op adapter until APNs/FCM credentials are delivered through External Secrets.
 
+## Project templates
+
+Project branding, versioned email/SMS template metadata, code-owned composers, receipt PDF attachments, and the release procedure are documented in [Project Notification Templates](project-notification-templates.md).
+
 ## Security
 
 - Raw contact destinations are not stored in `user_contacts`; only salted SHA-256 hashes and masked values are stored.

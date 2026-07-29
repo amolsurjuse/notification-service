@@ -1,0 +1,118 @@
+databaseChangeLog:
+  - changeSet:
+      id: 009-create-notification-template-catalog
+      author: codex
+      changes:
+        - createTable:
+            schemaName: notification
+            tableName: notification_projects
+            columns:
+              - column: { name: project_key, type: varchar(64), constraints: { primaryKey: true, nullable: false } }
+              - column: { name: display_name, type: varchar(160), constraints: { nullable: false } }
+              - column: { name: legal_name, type: varchar(200), constraints: { nullable: false } }
+              - column: { name: logo_resource, type: varchar(300), constraints: { nullable: false } }
+              - column: { name: primary_color, type: varchar(16), constraints: { nullable: false } }
+              - column: { name: from_email, type: varchar(240), constraints: { nullable: false } }
+              - column: { name: from_name, type: varchar(160), constraints: { nullable: false } }
+              - column: { name: reply_to_email, type: varchar(240), constraints: { nullable: false } }
+              - column: { name: support_email, type: varchar(240), constraints: { nullable: false } }
+              - column: { name: website_url, type: varchar(300), constraints: { nullable: false } }
+              - column: { name: business_address, type: varchar(500), constraints: { nullable: false } }
+              - column: { name: default_locale, type: varchar(16), constraints: { nullable: false } }
+              - column: { name: time_zone, type: varchar(64), constraints: { nullable: false } }
+              - column: { name: enabled, type: boolean, constraints: { nullable: false } }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: updated_at, type: timestamptz, constraints: { nullable: false } }
+        - createTable:
+            schemaName: notification
+            tableName: notification_templates
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: project_key, type: varchar(64), constraints: { nullable: false } }
+              - column: { name: template_key, type: varchar(128), constraints: { nullable: false } }
+              - column: { name: channel, type: varchar(32), constraints: { nullable: false } }
+              - column: { name: locale, type: varchar(16), constraints: { nullable: false } }
+              - column: { name: version, type: integer, constraints: { nullable: false } }
+              - column: { name: subject_template, type: text, constraints: { nullable: false } }
+              - column: { name: body_template, type: text, constraints: { nullable: false } }
+              - column: { name: content_type, type: varchar(80), constraints: { nullable: false } }
+              - column: { name: enabled, type: boolean, constraints: { nullable: false } }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: updated_at, type: timestamptz, constraints: { nullable: false } }
+        - modifyDataType:
+            schemaName: notification
+            tableName: notifications
+            columnName: body
+            newDataType: text
+        - addColumn:
+            schemaName: notification
+            tableName: notifications
+            columns:
+              - column: { name: template_project_key, type: varchar(64) }
+              - column: { name: template_version, type: integer }
+              - column: { name: rendered_content_type, type: varchar(80) }
+        - addForeignKeyConstraint:
+            baseTableSchemaName: notification
+            baseTableName: notification_templates
+            baseColumnNames: project_key
+            referencedTableSchemaName: notification
+            referencedTableName: notification_projects
+            referencedColumnNames: project_key
+            constraintName: fk_notification_templates_project
+        - addUniqueConstraint:
+            schemaName: notification
+            tableName: notification_templates
+            columnNames: project_key, template_key, channel, locale, version
+            constraintName: uq_notification_template_version
+        - createIndex:
+            schemaName: notification
+            tableName: notification_templates
+            indexName: idx_notification_templates_active
+            columns:
+              - column: { name: project_key }
+              - column: { name: template_key }
+              - column: { name: channel }
+              - column: { name: locale }
+              - column: { name: enabled }
+        - insert:
+            schemaName: notification
+            tableName: notification_projects
+            columns:
+              - column: { name: project_key, value: electrahub }
+              - column: { name: display_name, value: ElectraHub }
+              - column: { name: legal_name, value: ElectraHub }
+              - column: { name: logo_resource, value: notification-assets/electrahub-logo.png }
+              - column: { name: primary_color, value: "#2563EB" }
+              - column: { name: from_email, value: no-reply@electrahub.net }
+              - column: { name: from_name, value: ElectraHub }
+              - column: { name: reply_to_email, value: support@electrahub.net }
+              - column: { name: support_email, value: support@electrahub.net }
+              - column: { name: website_url, value: "https://electrahub.net" }
+              - column: { name: business_address, value: "741 Village Dr, Edison, NJ 08817, USA" }
+              - column: { name: default_locale, value: en-US }
+              - column: { name: time_zone, value: America/New_York }
+              - column: { name: enabled, valueBoolean: true }
+              - column: { name: created_at, valueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, valueComputed: CURRENT_TIMESTAMP }
+        - insert:
+            schemaName: notification
+            tableName: notification_templates
+            columns:
+              - column: { name: id, value: 9d91be12-b538-4e12-bdf4-d05226b660d6 }
+              - column: { name: project_key, value: electrahub }
+              - column: { name: template_key, value: charging-receipt-ready }
+              - column: { name: channel, value: EMAIL }
+              - column: { name: locale, value: en-US }
+              - column: { name: version, valueNumeric: 1 }
+              - column:
+                  name: subject_template
+                  valueClobFile: ../templates/electrahub/charging-receipt-email.subject.txt
+                  encoding: UTF-8
+              - column:
+                  name: body_template
+                  valueClobFile: ../templates/electrahub/charging-receipt-email.html
+                  encoding: UTF-8
+              - column: { name: content_type, value: "text/html; charset=UTF-8" }
+              - column: { name: enabled, valueBoolean: true }
+              - column: { name: created_at, valueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, valueComputed: CURRENT_TIMESTAMP }
