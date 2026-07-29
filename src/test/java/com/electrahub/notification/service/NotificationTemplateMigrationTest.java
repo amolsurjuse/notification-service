@@ -32,7 +32,7 @@ class NotificationTemplateMigrationTest {
 
             try (var statement = connection.createStatement();
                  var result = statement.executeQuery("""
-                         select p.display_name, t.subject_template, t.body_template
+                         select p.display_name, p.from_email, t.subject_template, t.body_template
                          from notification.notification_projects p
                          join notification.notification_templates t on t.project_key = p.project_key
                          where p.project_key = 'electrahub'
@@ -41,6 +41,7 @@ class NotificationTemplateMigrationTest {
                          """)) {
                 assertThat(result.next()).isTrue();
                 assertThat(result.getString("display_name")).isEqualTo("ElectraHub");
+                assertThat(result.getString("from_email")).isEqualTo("no-reply@notify.electrahub.net");
                 assertThat(result.getString("subject_template")).contains("projectDisplayName");
                 assertThat(result.getString("body_template"))
                         .contains("cid:project-logo")

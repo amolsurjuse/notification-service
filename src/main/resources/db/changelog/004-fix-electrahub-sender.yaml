@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: 010-fix-electrahub-sender-identity
+      author: codex
+      changes:
+        - update:
+            schemaName: notification
+            tableName: notification_projects
+            columns:
+              - column: { name: from_email, value: no-reply@notify.electrahub.net }
+              - column: { name: updated_at, valueComputed: CURRENT_TIMESTAMP }
+            where: project_key = 'electrahub'

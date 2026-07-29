@@ -88,7 +88,7 @@ notification:
         port: ${NOTIFICATION_EMAIL_SMTP_PORT:587}
         username: ${NOTIFICATION_EMAIL_SMTP_USERNAME:}
         password: ${NOTIFICATION_EMAIL_SMTP_PASSWORD:}
-        from-email: ${NOTIFICATION_EMAIL_SMTP_FROM_EMAIL:no-reply@electrahub.net}
+        from-email: ${NOTIFICATION_EMAIL_SMTP_FROM_EMAIL:no-reply@notify.electrahub.net}
         from-name: ${NOTIFICATION_EMAIL_SMTP_FROM_NAME:ElectraHub}
         starttls-enabled: ${NOTIFICATION_EMAIL_SMTP_STARTTLS_ENABLED:true}
         auth-enabled: ${NOTIFICATION_EMAIL_SMTP_AUTH_ENABLED:true}

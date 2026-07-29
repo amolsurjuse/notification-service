@@ -97,7 +97,7 @@ public class ChannelAdapterConfig {
             @Value("${notification.channel.email.smtp.port:587}") int emailSmtpPort,
             @Value("${notification.channel.email.smtp.username:}") String emailSmtpUsername,
             @Value("${notification.channel.email.smtp.password:}") String emailSmtpPassword,
-            @Value("${notification.channel.email.smtp.from-email:no-reply@electrahub.net}") String emailFromEmail,
+            @Value("${notification.channel.email.smtp.from-email:no-reply@notify.electrahub.net}") String emailFromEmail,
             @Value("${notification.channel.email.smtp.from-name:ElectraHub}") String emailFromName,
             @Value("${notification.channel.email.smtp.starttls-enabled:true}") boolean emailStartTlsEnabled,
             @Value("${notification.channel.email.smtp.auth-enabled:true}") boolean emailAuthEnabled,

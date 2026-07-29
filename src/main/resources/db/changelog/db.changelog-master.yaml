@@ -5,3 +5,5 @@ databaseChangeLog:
       file: db/changelog/002-create-communication-preferences.yaml
   - include:
       file: db/changelog/003-create-notification-template-catalog.yaml
+  - include:
+      file: db/changelog/004-fix-electrahub-sender.yaml
