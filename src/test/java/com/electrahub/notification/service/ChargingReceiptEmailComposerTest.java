@@ -104,6 +104,47 @@ class ChargingReceiptEmailComposerTest {
         });
     }
 
+    @Test
+    void preservesUnicodeCurrencySymbolsAndNamesInPdfReceipts() throws Exception {
+        ChargingReceiptEmailComposer composer = new ChargingReceiptEmailComposer(
+                new ChargingReceiptPdfGenerator());
+
+        EmailTemplateData result = composer.compose(Map.ofEntries(
+                Map.entry("sessionId", "f6902547-c293-474c-94a4-b8c95651cf4f"),
+                Map.entry("stationName", "München Central"),
+                Map.entry("connectorLabel", "CON-EU-0012"),
+                Map.entry("totalCost", 0.49),
+                Map.entry("currency", "EUR"),
+                Map.entry("energyKwh", 1.322),
+                Map.entry("tariffPerKwh", 0.40),
+                Map.entry("taxesUsd", 0.08),
+                Map.entry("taxCountryCode", "FR"),
+                Map.entry("supplierLegalName", "Electra Hub Europe BV"),
+                Map.entry("supplierTaxRegistration", "FR00000000000"),
+                Map.entry("paymentMethod", "Credit Card"),
+                Map.entry("status", "COMPLETED"),
+                Map.entry("chargingCost", 0.49),
+                Map.entry("startedAt", "2026-07-30T13:34:00Z"),
+                Map.entry("stoppedAt", "2026-07-30T13:36:00Z")
+        ), configuration());
+
+        assertThat(result.attachments()).singleElement().satisfies(attachment -> {
+            try {
+                try (var document = Loader.loadPDF(attachment.content())) {
+                    String text = new PDFTextStripper().getText(document);
+                    assertThat(text)
+                            .contains("München Central")
+                            .contains("€0.40 / kWh")
+                            .contains("€0.49")
+                            .doesNotContain("?0.40")
+                            .doesNotContain("?0.49");
+                }
+            } catch (Exception exception) {
+                throw new AssertionError(exception);
+            }
+        });
+    }
+
     static NotificationTemplateCatalog.ProjectConfiguration configuration() throws Exception {
         NotificationProject project = new NotificationProject(
                 "electrahub",
