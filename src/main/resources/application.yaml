@@ -97,6 +97,10 @@ notification:
         write-timeout-ms: ${NOTIFICATION_EMAIL_SMTP_WRITE_TIMEOUT_MS:10000}
     sms:
       real-send-enabled: ${NOTIFICATION_CHANNEL_SMS_REAL_SEND_ENABLED:false}
+      twilio:
+        account-sid: ${TWILIO_ACCOUNT_SID:}
+        auth-token: ${TWILIO_AUTH_TOKEN:}
+        from-number: ${TWILIO_FROM_NUMBER:}
     push:
       real-send-enabled: ${NOTIFICATION_CHANNEL_PUSH_REAL_SEND_ENABLED:false}
       daily-limit: ${NOTIFICATION_CHANNEL_PUSH_DAILY_LIMIT:500}

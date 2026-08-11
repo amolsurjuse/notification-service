@@ -103,6 +103,7 @@ public class DomainNotificationEventListener {
             case "USER_ACCOUNT_CREATED" -> List.of(Channel.PUSH, Channel.IN_APP);
             case "USER_PASSWORD_CHANGED" -> List.of(Channel.EMAIL, Channel.PUSH, Channel.IN_APP);
             case "USER_PASSWORD_RESET_REQUESTED", "USER_EMAIL_VERIFICATION_REQUESTED" -> List.of(Channel.EMAIL);
+            case "USER_PHONE_OTP_REQUESTED" -> List.of(Channel.SMS);
             case "CHARGING_SESSION_STARTED", "CHARGING_SESSION_STOPPED", "CHARGING_SESSION_START_TIMEOUT", "CHARGING_BATTERY_FULL",
                  "CHARGING_IDLE_WARNING", "CHARGING_IDLE_STARTED", "CHARGING_IDLE_FEE_STARTED", "CHARGING_LOW_BALANCE_STOP" -> List.of(Channel.PUSH, Channel.IN_APP);
             case "PAYMENT_RECEIPT_READY", "CHARGING_RECEIPT_READY" -> List.of(Channel.EMAIL, Channel.PUSH, Channel.IN_APP);
@@ -138,6 +139,7 @@ public class DomainNotificationEventListener {
             case "USER_PASSWORD_CHANGED" -> "Your ElectraHub password was changed";
             case "USER_PASSWORD_RESET_REQUESTED" -> "Reset your ElectraHub password";
             case "USER_EMAIL_VERIFICATION_REQUESTED" -> "Verify your ElectraHub email";
+            case "USER_PHONE_OTP_REQUESTED" -> "PulseVote verification code";
             case "CHARGING_SESSION_STARTED" -> "Charging session started";
             case "CHARGING_SESSION_STOPPED" -> "Charging session stopped";
             case "CHARGING_SESSION_START_TIMEOUT" -> "Charging could not start";
@@ -164,6 +166,9 @@ public class DomainNotificationEventListener {
         return switch (eventType) {
             case "USER_PASSWORD_RESET_REQUESTED" -> "Use this link to reset your password: " + payload.getOrDefault("resetUrl", "");
             case "USER_EMAIL_VERIFICATION_REQUESTED" -> "Use this link to verify your email address: " + payload.getOrDefault("verificationUrl", "");
+            case "USER_PHONE_OTP_REQUESTED" -> "Your PulseVote verification code is "
+                    + payload.getOrDefault("code", "") + ". It expires in "
+                    + payload.getOrDefault("expiresInMinutes", "10") + " minutes.";
             case "USER_PASSWORD_CHANGED" -> "Your password was changed. If this was not you, contact support immediately.";
             case "CHARGING_SESSION_STARTED" -> "Your charging session has started.";
             case "CHARGING_SESSION_STOPPED" -> "Your charging session has stopped.";
