@@ -10,6 +10,7 @@ import com.electrahub.notification.service.FirebasePushSender;
 import com.electrahub.notification.service.NoopChannelAdapter;
 import com.electrahub.notification.service.QuotaLimitedEmailAdapter;
 import com.electrahub.notification.service.SmtpEmailAdapter;
+import com.electrahub.notification.service.TwilioSmsAdapter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.health.contributor.Health;
@@ -104,6 +105,10 @@ public class ChannelAdapterConfig {
             @Value("${notification.channel.email.smtp.connection-timeout-ms:10000}") int emailConnectionTimeoutMs,
             @Value("${notification.channel.email.smtp.timeout-ms:10000}") int emailTimeoutMs,
             @Value("${notification.channel.email.smtp.write-timeout-ms:10000}") int emailWriteTimeoutMs,
+            @Value("${notification.channel.sms.real-send-enabled:false}") boolean smsEnabled,
+            @Value("${notification.channel.sms.twilio.account-sid:}") String twilioAccountSid,
+            @Value("${notification.channel.sms.twilio.auth-token:}") String twilioAuthToken,
+            @Value("${notification.channel.sms.twilio.from-number:}") String twilioFromNumber,
             @Value("${notification.channel.push.real-send-enabled:false}") boolean pushEnabled,
             @Value("${notification.channel.push.daily-limit:500}") int pushDailyLimit,
             @Value("${notification.channel.push.rate-per-second:5}") int pushRatePerSecond
@@ -135,7 +140,7 @@ public class ChannelAdapterConfig {
                         emailDailyLimit,
                         emailRatePerSecond
                 ),
-                new NoopChannelAdapter(Channel.SMS),
+                new TwilioSmsAdapter(smsEnabled, twilioAccountSid, twilioAuthToken, twilioFromNumber),
                 new FirebasePushAdapter(
                         notificationRepository,
                         pushDeviceRepository,
