@@ -53,6 +53,7 @@ management:
 notification:
   user-service:
     base-url: ${NOTIFICATION_USER_SERVICE_BASE_URL:http://user-service:8082}
+    internal-token: ${APP_SECURITY_INTERNAL_TOKEN:}
   sensitive-email:
     max-attempts: ${NOTIFICATION_SENSITIVE_EMAIL_MAX_ATTEMPTS:4}
   broker:

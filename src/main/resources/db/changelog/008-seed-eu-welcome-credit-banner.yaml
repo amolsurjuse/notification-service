@@ -1,0 +1,33 @@
+databaseChangeLog:
+  - changeSet:
+      id: 008-seed-eu-welcome-credit-banner
+      author: codex
+      changes:
+        - insert:
+            schemaName: notification
+            tableName: banner_campaign
+            columns:
+              - column: { name: id, valueComputed: gen_random_uuid() }
+              - column: { name: campaign_key, value: EU_WELCOME_CREDIT_2026 }
+              - column: { name: title, value: "€200 welcome credit added" }
+              - column: { name: message, value: "Welcome to ElectraHub! Your €200 promotional wallet credit is ready to use." }
+              - column: { name: style, value: SUCCESS }
+              - column: { name: action_label, value: View wallet }
+              - column: { name: action_url, value: "electrahub://payments" }
+              - column: { name: screen_names, value: "SIGN_IN,DASHBOARD,PAYMENTS" }
+              - column: { name: platforms, value: "IOS,ANDROID,WEB" }
+              - column: { name: locales, value: "*" }
+              - column: { name: included_countries, value: "NL,DE" }
+              - column: { name: excluded_countries, value: "" }
+              - column: { name: registered_from, valueComputed: "CAST('2026-08-28 00:00:00+00' AS TIMESTAMP WITH TIME ZONE)" }
+              - column: { name: starts_at, valueComputed: "CAST('2026-08-28 00:00:00+00' AS TIMESTAMP WITH TIME ZONE)" }
+              - column: { name: ends_at, valueComputed: "CAST('2026-12-31 23:59:59+00' AS TIMESTAMP WITH TIME ZONE)" }
+              - column: { name: active, valueBoolean: true }
+              - column: { name: dismissible, valueBoolean: true }
+              - column: { name: priority, valueNumeric: 100 }
+              - column: { name: metadata, value: '{"creditAmount":200,"currency":"EUR","campaign":"EU_WELCOME_2026"}' }
+      rollback:
+        - delete:
+            schemaName: notification
+            tableName: banner_campaign
+            where: campaign_key = 'EU_WELCOME_CREDIT_2026'

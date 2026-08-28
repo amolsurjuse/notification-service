@@ -11,3 +11,7 @@ databaseChangeLog:
       file: db/changelog/005-add-country-specific-receipt-templates.yaml
   - include:
       file: db/changelog/006-upgrade-compliant-receipt-templates.yaml
+  - include:
+      file: db/changelog/007-create-in-app-banner-campaigns.yaml
+  - include:
+      file: db/changelog/008-seed-eu-welcome-credit-banner.yaml

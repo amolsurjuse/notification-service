@@ -1,0 +1,48 @@
+databaseChangeLog:
+  - changeSet:
+      id: 007-create-in-app-banner-campaigns
+      author: codex
+      changes:
+        - createTable:
+            schemaName: notification
+            tableName: banner_campaign
+            columns:
+              - column: { name: id, type: UUID, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: campaign_key, type: VARCHAR(96), constraints: { nullable: false, unique: true } }
+              - column: { name: title, type: VARCHAR(160), constraints: { nullable: false } }
+              - column: { name: message, type: VARCHAR(1000), constraints: { nullable: false } }
+              - column: { name: style, type: VARCHAR(24), defaultValue: INFO, constraints: { nullable: false } }
+              - column: { name: action_label, type: VARCHAR(80) }
+              - column: { name: action_url, type: VARCHAR(500) }
+              - column: { name: screen_names, type: VARCHAR(1000), defaultValue: '*', constraints: { nullable: false } }
+              - column: { name: platforms, type: VARCHAR(500), defaultValue: '*', constraints: { nullable: false } }
+              - column: { name: locales, type: VARCHAR(1000), defaultValue: '*', constraints: { nullable: false } }
+              - column: { name: included_countries, type: VARCHAR(1000), defaultValue: '*', constraints: { nullable: false } }
+              - column: { name: excluded_countries, type: VARCHAR(1000), defaultValue: '', constraints: { nullable: false } }
+              - column: { name: registered_from, type: TIMESTAMPTZ }
+              - column: { name: registered_until, type: TIMESTAMPTZ }
+              - column: { name: starts_at, type: TIMESTAMPTZ, constraints: { nullable: false } }
+              - column: { name: ends_at, type: TIMESTAMPTZ }
+              - column: { name: active, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: dismissible, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: priority, type: INT, defaultValueNumeric: 0, constraints: { nullable: false } }
+              - column: { name: metadata, type: JSONB, defaultValueComputed: "'{}'::jsonb", constraints: { nullable: false } }
+              - column: { name: created_at, type: TIMESTAMPTZ, defaultValueComputed: now(), constraints: { nullable: false } }
+              - column: { name: updated_at, type: TIMESTAMPTZ, defaultValueComputed: now(), constraints: { nullable: false } }
+        - createIndex:
+            schemaName: notification
+            tableName: banner_campaign
+            indexName: ix_banner_campaign_delivery
+            columns:
+              - column: { name: active }
+              - column: { name: starts_at }
+              - column: { name: ends_at }
+              - column: { name: priority }
+        - sql:
+            sql: |
+              ALTER TABLE notification.banner_campaign
+                ADD CONSTRAINT ck_banner_campaign_window CHECK (ends_at IS NULL OR ends_at > starts_at);
+              ALTER TABLE notification.banner_campaign
+                ADD CONSTRAINT ck_banner_registration_window CHECK (registered_until IS NULL OR registered_from IS NULL OR registered_until > registered_from);
+      rollback:
+        - dropTable: { schemaName: notification, tableName: banner_campaign }
